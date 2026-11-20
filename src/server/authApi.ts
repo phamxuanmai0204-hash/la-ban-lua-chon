@@ -62,8 +62,11 @@ class JsonCollection<T> {
   private data: T[] | null = null;
   private loading: Promise<T[]> | null = null;
   private queue: Promise<void> = Promise.resolve();
+  private readonly file: string;
 
-  constructor(private readonly file: string) {}
+  constructor(file: string) {
+    this.file = file;
+  }
 
   async read(): Promise<T[]> {
     if (this.data) return this.data;

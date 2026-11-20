@@ -688,7 +688,8 @@ Yêu cầu:
     res.json({ ok: true });
   });
 
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd =
+    process.env.NODE_ENV === "production" || process.env.RENDER === "true";
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -699,7 +700,10 @@ Yêu cầu:
   } else {
     const distDir = path.resolve(__dirname, "dist");
     app.use(express.static(distDir));
-    app.get("/{*path}", (_req, res) => {
+    app.use("/api", (_req, res) => {
+      res.status(404).json({ error: "Không tìm thấy endpoint API." });
+    });
+    app.get("*", (_req, res) => {
       res.sendFile(path.join(distDir, "index.html"));
     });
   }
