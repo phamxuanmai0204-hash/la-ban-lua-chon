@@ -3,17 +3,46 @@
 
 @layer base {
   :root {
-    --font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
-    --font-serif: "Fraunces", Georgia, serif;
+    --font-sans: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-serif: "Lora", Georgia, serif;
+    --compass-sky: #B3DEE2;
+    --compass-sage: #EAF2D7;
+    --compass-rose: #E27396;
+    --compass-rose-ink: #9D2950;
+    --compass-blush: #EA9AB2;
+    --compass-petal: #EFCFE3;
   }
 
   html {
     font-family: var(--font-sans);
     scroll-behavior: smooth;
+    font-size: 16px;
+  }
+
+  html[data-font-size="small"] {
+    font-size: 14px;
+  }
+
+  html[data-font-size="medium"] {
+    font-size: 16px;
+  }
+
+  html[data-font-size="large"] {
+    font-size: 18px;
   }
 
   h1, h2, h3 {
     text-wrap: balance;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid #9D2950;
+    outline-offset: 2px;
   }
 }
 
@@ -26,5 +55,44 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* A4 Print Stylesheet for Phiếu Cam Kết */
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  body.printing-commitment * {
+    visibility: hidden;
+  }
+
+  body.printing-commitment #print-commitment-a4,
+  body.printing-commitment #print-commitment-a4 * {
+    visibility: visible;
+  }
+
+  body.printing-commitment #print-commitment-a4 {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .no-print {
+    display: none !important;
   }
 }

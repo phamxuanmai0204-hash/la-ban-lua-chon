@@ -1,189 +1,379 @@
-export type UserRole = "student" | "teacher" | "parent";
+export type Role = "student" | "teacher" | "parent" | "school_admin";
 
 export type JourneyStep = "THU" | "LỌC" | "THỬ" | "CHỐT" | "CAM KẾT";
 
-export type QualitativeLevel = "Hạn chế" | "Đang hình thành" | "Khá rõ nét" | "Vững vàng";
+export type QualitativeLevel =
+  | "Hạn chế"
+  | "Đang hình thành"
+  | "Khá rõ nét"
+  | "Vững vàng";
 
-export type HollandGroup =
-  | "Kĩ thuật"
-  | "Nghiên cứu"
-  | "Nghệ thuật"
-  | "Xã hội"
-  | "Quản lí"
-  | "Nghiệp vụ";
+export type CriterionMatch = "Đáp ứng" | "Chưa đáp ứng" | "Chưa rõ";
 
-export type FilterCellStatus = "Đáp ứng" | "Chưa đáp ứng" | "Chưa rõ";
+export type HollandGroupId =
+  | "ki_thuat"
+  | "nghien_cuu"
+  | "nghe_thuat"
+  | "xa_hoi"
+  | "quan_li"
+  | "nghiep_vu";
 
-export interface RealStoryLink {
-  id: string;
-  title: string;
-  alumniRole: string;
-  summary: string;
-  url: string;
+export interface Profile {
+  abilitiesTeacherNote: string;
+  abilitiesStudentSelf: string;
+  hollandSelectedIds: string[];
+  hollandSummaryText: string;
+  conditions: {
+    commuteDistance: string;
+    familyFinance: string;
+    earlyIndependence: string;
+    healthNote: string;
+  };
 }
 
-export interface PathwayItem {
+export interface BehaviorSignal {
+  changeOptionCount: number;
+  addedAfterCommit: boolean;
+  abandonedCommitStep: boolean;
+  hesitancyPhrasesCount: number;
+  recentPhrases: string[];
+  hasSensitiveAlert: boolean;
+}
+
+export interface Criterion {
+  id: string;
+  label: string;
+}
+
+export interface OptionEvaluation {
+  id: string;
+  pathwayId: string;
+  title: string;
+  status: "Đang cân nhắc" | "Tạm gác lại" | "Đã chọn";
+  evaluations: Record<string, CriterionMatch>;
+}
+
+export interface ActionTask {
   id: string;
   title: string;
-  shortTitle: string;
-  branchType: "thpt" | "gdtx" | "nghe" | "dilam";
-  entryCondition: string;
-  studyContent: string;
-  careerOpportunity: string;
-  articulationNote: string;
-  schoolNames: string; // Empty/placeholder "Nhà trường cập nhật" by default
-  estimatedCost: string; // Empty/placeholder "Nhà trường cập nhật" by default
-  admissionReference: string; // Empty/placeholder "Nhà trường cập nhật" by default
-  realStories: RealStoryLink[];
+  dueDate?: string;
+  done: boolean;
+}
+
+export interface Commitment {
+  studentDisplayCode: string;
+  studentNamePlaceholder: string;
+  className: string;
+  chosenOption: string;
+  reasonInOwnWords: string;
+  preMortemNote?: string;
+  actionPlan: ActionTask[];
+  deadlineDate: string;
+  studentConfirmedAt: string | null;
+  parentConfirmedAt: string | null;
+  teacherConfirmedAt: string | null;
+}
+
+export interface JournalReflection3Q {
+  saw: string;
+  felt: string;
+  changedMind: string;
 }
 
 export interface JournalEntry {
   id: string;
   date: string;
+  step?: JourneyStep;
+  pathwayId?: string;
+  pathwayTitle?: string;
   activityType: string;
-  reflection: string;
-  aiPromptId?: string;
+  content: string;
+  reflection3Q?: JournalReflection3Q;
 }
 
-export interface TryActivity {
+export interface ScenarioReflection {
+  id: string;
+  pathwayId: string;
+  pathwayTitle: string;
+  chosenPathLabels: string[];
+  reflection: string;
+  date: string;
+}
+
+export type RubricCriterionKey =
+  | "understandingSelf"
+  | "understandingPathways"
+  | "narrowingOptions"
+  | "decidingOnTime"
+  | "committingAndActing";
+
+export interface AssessmentLevelMap {
+  understandingSelf: QualitativeLevel;
+  understandingPathways: QualitativeLevel;
+  narrowingOptions: QualitativeLevel;
+  decidingOnTime: QualitativeLevel;
+  committingAndActing: QualitativeLevel;
+  notes?: string;
+  evidence?: string;
+  criterionEvidence?: Partial<Record<RubricCriterionKey, string>>;
+}
+
+export interface Assessment {
+  before: AssessmentLevelMap;
+  after: AssessmentLevelMap;
+  studentSelf: AssessmentLevelMap;
+}
+
+export interface Student {
+  id: string;
+  code: string; // e.g., "HS A", "HS B", "HS 05"
+  anonymizedLabel: string; // e.g., "HS 01"
+  className: string;
+  isCaseStudy?: boolean;
+  caseStudySummary?: string;
+  isFocusGroup: boolean;
+  currentStep: JourneyStep;
+  completedSteps?: JourneyStep[];
+  shareWithParent: boolean;
+  privacyConsentAccepted: boolean;
+  privacyConsentAcceptedAt?: string;
+  dataDeletionRequestedAt?: string;
+  profile: Profile;
+  criteria: Criterion[];
+  consideredOptions: OptionEvaluation[];
+  joinedExperienceIds: string[];
+  journal: JournalEntry[];
+  scenarioReflections?: ScenarioReflection[];
+  commitment: Commitment;
+  signals: BehaviorSignal;
+  assessment: Assessment;
+}
+
+export interface RealStoryLink {
   id: string;
   title: string;
-  category: string;
-  date: string;
+  personDesc: string;
+  url: string;
+  suggestedQuestions?: string[];
+}
+
+export interface CareerScenarioChoice {
+  id: string;
+  label: string;
+  nextNodeId: string | null;
+  outcomeNote: string;
+}
+
+export interface CareerScenarioNode {
+  id: string;
+  prompt: string;
+  choices: CareerScenarioChoice[];
+}
+
+export interface CareerScenario {
+  title: string;
+  intro: string;
+  startNodeId: string;
+  nodes: CareerScenarioNode[];
+  reflectionPrompt: string;
+}
+
+export interface Pathway {
+  id: string;
+  category:
+    | "THPT"
+    | "GDTX"
+    | "TRUNG_CAP"
+    | "SO_CAP"
+    | "LIEN_THONG_CD_DH"
+    | "DI_LAM";
+  title: string;
+  shortSubtitle: string;
+  entryRequirements: string;
+  learningContent: string;
+  careerOpportunities: string;
+  articulationPath: string;
+  // Never fabricated: blank by default -> displays "Nhà trường cập nhật"
+  realSchoolNames: string;
+  tuitionEstimate: string;
+  admissionCutoff: string;
+  employmentData: string;
+  realStories: RealStoryLink[];
+  scenario?: CareerScenario;
+}
+
+export interface Experience {
+  id: string;
+  title: string;
+  activityType: string;
+  dateLabel: string;
   location: string;
   description: string;
+  pathwayId?: string;
 }
 
-export interface StudentTryRegistration {
-  activityId: string;
-  status: "Đã đăng kí" | "Đã tham gia";
-  reflection?: string;
-}
+export type AIMessageStatus =
+  | "chờ duyệt"
+  | "giữ nguyên"
+  | "giáo viên đã sửa"
+  | "chuyển tư vấn";
 
-export interface AIReviewItem {
+export type AIQuestionType =
+  | "doi_chieu_tieu_chi"
+  | "phan_tu_cam_xuc"
+  | "goi_mo_thong_tin"
+  | "dong_vien";
+
+export interface AIMessage {
   id: string;
   studentId: string;
+  studentCode: string;
   createdAt: string;
   triggerReason: string;
-  studentInput: string;
+  studentText: string;
   aiReply: string;
+  originalAiReply?: string;
   teacherEditedReply?: string;
   teacherEncouragement?: string;
   nhayCam: boolean;
   dauHieu: string;
-  status: "Chờ duyệt" | "Đã giữ nguyên" | "Đã sửa" | "Chuyển tư vấn trực tiếp";
+  loaiCauHoi?: AIQuestionType;
+  layer1Triggered?: boolean;
+  layer2Filtered?: boolean;
+  layer2Reason?: string;
+  status: AIMessageStatus;
   visibleToStudent: boolean;
-  reviewedAt?: string;
 }
 
-export interface ChatMessage {
+export type AIModerationAction =
+  | "tạo mới"
+  | "giữ nguyên"
+  | "giáo viên đã sửa"
+  | "chuyển tư vấn"
+  | "thêm lời động viên"
+  | "lọc lớp 1"
+  | "lọc lớp 2";
+
+export interface AIModerationLog {
   id: string;
-  sender: "student" | "ai";
-  text: string;
-  createdAt: string;
-  reviewId?: string;
-  nhayCam?: boolean;
+  messageId: string;
+  studentId: string;
+  studentCode: string;
+  action: AIModerationAction;
+  actor: string;
+  timestamp: string;
+  studentText: string;
+  originalReply: string;
+  editedReply?: string;
+  reason?: string;
 }
 
-export interface ActionTask {
+export type ThematicCodeStatus = "pending" | "accepted" | "rejected";
+
+export interface ThematicCodeItem {
   id: string;
-  text: string;
-  done: boolean;
+  theme: string;
+  codeLabel: string;
+  evidenceQuote: string;
+  sourceLabel: string;
+  journalId: string;
+  studentCode: string;
+  status: ThematicCodeStatus;
+  aiGenerated: boolean;
 }
 
-export interface CommitmentData {
-  studentDisplayName: string;
-  className: string;
-  chosenPathwayId: string;
-  chosenOptionLabel: string;
-  reasonInOwnWords: string;
-  deadlineDate: string;
-  actionPlan: ActionTask[];
-  studentConfirmedAt?: string;
-  parentConfirmedAt?: string;
-  teacherConfirmedAt?: string;
-}
-
-export interface RubricCriterionScores {
-  hieuBanThan: QualitativeLevel;
-  hieuLoTrinh: QualitativeLevel;
-  thuHepLuaChon: QualitativeLevel;
-  chotQuyetDinh: QualitativeLevel;
-  camKetHanhDong: QualitativeLevel;
-}
-
-export interface StudentRubricRecord {
-  beforeTeacher: RubricCriterionScores;
-  afterTeacher: RubricCriterionScores;
-  teacherNote: string;
-  studentSelf?: RubricCriterionScores;
-}
-
-export interface StudentProfileData {
-  id: string; // Anonymous ID: HS A, HS B, HS C, HS D, HS 05 ... HS 45
-  className: string;
-  isFocusGroup: boolean; // Nhóm trọng tâm (teacher marked)
-  currentStep: JourneyStep;
-  hasLockedChoice: boolean;
-  shareWithParent: boolean;
-  parentReadOnlyNotice?: string;
-  storyTag?: string; // e.g., "Trường hợp minh họa chi tiết"
-  // Layer 1: Năng lực (verbal only)
-  teacherAbilityNote: string;
-  studentAbilityNote: string;
-  // Layer 2: Hứng thú Holland
-  selectedHollandAnswers: string[];
-  // Layer 3: Điều kiện
-  conditions: {
-    travelDistance: string;
-    familyFinance: string;
-    earlyIndependence: string;
-    healthNote: string;
-  };
-  // Step THU -> Saved options
-  consideredOptionIds: string[];
-  // Step LỌC -> Criteria & Matrix
-  criteria: string[];
-  filterMatrix: Record<string, Record<string, FilterCellStatus>>;
-  // Step THỬ -> Journal & Try activities
-  journal: JournalEntry[];
-  tryRegistrations: StudentTryRegistration[];
-  // AI Chat history
-  chatMessages: ChatMessage[];
-  // Step CHỐT & CAM KẾT
-  commitment: CommitmentData;
-  // Behavioral tracking (for teacher view only, displayed as verbal descriptions)
-  behaviorCounters: {
-    optionChangesCount: number;
-    addedAfterLockCount: number;
-    abandonedLockCount: number;
-    hesitantPhrasesCount: number;
-    sensitiveAlert: boolean;
-    customNotes: string[];
-  };
-  // Qualitative Rubric Assessment
-  rubric: StudentRubricRecord;
-}
-
-export interface MeetingRecord {
+export interface Meeting {
   id: string;
   studentId: string;
+  studentCode: string;
   dateTime: string;
   locationOrChannel: string;
-  participants: string;
   parentInvited: boolean;
-  parentAcknowledged: boolean;
-  summaryPoints: string;
+  status: "Đã lên lịch" | "Đã họp";
+  keyPoints: string;
   agreedChoice: string;
-  nextNotes: string;
+  nextSteps?: string;
+  confirmations?: {
+    student?: boolean;
+    parent?: boolean;
+    teacher?: boolean;
+  };
+}
+
+export type FontSizeScale = "small" | "medium" | "large";
+
+export interface AppSettings {
+  requireTeacherApprovalBeforeDisplay: boolean;
+  darkMode: boolean;
+  fontSize?: FontSizeScale;
+  googleFormSurveyUrl?: string;
+}
+
+export interface LinkedChild {
+  /** id học sinh mẫu (ví dụ "hs-02") hoặc "acc:<id tài khoản học sinh>" */
+  studentId: string;
+  className: string;
+  displayName: string;
+  linkedAt: string;
+}
+
+export interface AuthUser {
+  id: string;
+  fullName: string;
+  role: Role;
+  username: string;
+  createdAt: string;
+  /** Lớp của tài khoản Học sinh */
+  className?: string;
+  /** Mã PIN 4 số dành cho phụ huynh (chỉ trả về cho chính tài khoản Học sinh) */
+  parentPin?: string;
+  /** Danh sách con đã liên kết (chỉ có ở tài khoản Phụ huynh) */
+  linkedChildren?: LinkedChild[];
+}
+
+export interface AuthSession {
+  token: string;
+  user: AuthUser;
+}
+
+export interface RegisterAccountInput {
+  fullName: string;
+  role: Role;
+  username: string;
+  password: string;
+  confirmPassword: string;
+  /** Học sinh: lớp đang học */
+  className?: string;
+  /** Học sinh: mã PIN 4 số chia sẻ cho phụ huynh */
+  parentPin?: string;
+  /** Phụ huynh: liên kết con khi đăng ký */
+  childClassName?: string;
+  childStudentId?: string;
+  childPin?: string;
+}
+
+export interface LoginAccountInput {
+  username: string;
+  password: string;
+}
+
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId: string;
 }
 
 export interface AppState {
-  students: StudentProfileData[];
-  pathways: PathwayItem[];
-  tryActivities: TryActivity[];
-  aiQueue: AIReviewItem[];
-  meetings: MeetingRecord[];
-  requireTeacherPreApproval: boolean; // Default OFF
-  consentAccepted: boolean;
+  schemaVersion: number;
+  students: Student[];
+  pathways: Pathway[];
+  experiences: Experience[];
+  aiMessages: AIMessage[];
+  aiModerationLogs: AIModerationLog[];
+  thematicCodes: ThematicCodeItem[];
+  meetings: Meeting[];
+  settings: AppSettings;
 }

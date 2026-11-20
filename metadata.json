@@ -1,6 +1,6 @@
 {
   "name": "La Bàn Lựa Chọn",
-  "description": "Hệ thống hỗ trợ ra quyết định hướng nghiệp cho học sinh lớp 9 theo quy trình 5 bước THU - LỌC - THỬ - CHỐT - CAM KẾT.",
+  "description": "Hệ thống hỗ trợ ra quyết định chọn hướng đi sau THCS dành cho học sinh lớp 9, giáo viên và phụ huynh.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
