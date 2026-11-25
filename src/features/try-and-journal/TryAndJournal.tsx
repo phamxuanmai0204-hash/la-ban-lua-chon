@@ -142,6 +142,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
 
   const activeScenarioPathway = pathways.find((p) => p.id === scenarioPathwayId);
   const activeScenario = activeScenarioPathway?.scenario;
+  const isShortAnswer = activeScenario?.responseMode === "shortAnswer";
 
   useEffect(() => {
     if (activeScenario) {
@@ -302,7 +303,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
       pathwayId: activeScenarioPathway.id,
       pathwayTitle: activeScenarioPathway.title,
       activityType: "Bài tập tình huống nghề",
-      content: `[Một ngày làm nghề – ${activeScenarioPathway.title}] ${clean}`,
+      content: `[Thử một ngày theo lộ trình – ${activeScenarioPathway.title}] ${clean}`,
     };
 
     onUpdateStudent({
@@ -425,7 +426,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1.3A: Interactive Branching Scenario - "Một ngày làm nghề" */}
+      {/* 1.3A: Thử một ngày theo lộ trình (tình huống tương tác) */}
       <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -434,7 +435,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold">
-                Một ngày làm nghề (Tình huống tương tác)
+                Thử một ngày theo lộ trình
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                 Thử đặt mình vào nhịp học và làm việc thực tế của từng lộ trình — không chấm điểm đúng sai.
@@ -443,7 +444,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
           </div>
 
           <select
-            aria-label="Chọn lộ trình để thử tình huống một ngày làm nghề"
+            aria-label="Chọn lộ trình để thử một ngày theo lộ trình"
             value={scenarioPathwayId}
             onChange={(e) => setScenarioPathwayId(e.target.value)}
             className="min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3 py-2 text-sm"
@@ -497,58 +498,124 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
               </div>
             )}
 
-            {currentNode && !scenarioDone && (
-              <div className="space-y-3 pt-1">
-                <p className="text-sm sm:text-[15px] font-semibold leading-relaxed text-[#1D242B] dark:text-white">
-                  {currentNode.prompt}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {currentNode.choices.map((ch) => (
-                    <button
-                      key={ch.id}
-                      type="button"
-                      onClick={() => handlePickScenarioChoice(ch)}
-                      className="text-left p-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] hover:border-[#E27396] hover:bg-[#EFCFE3]/20 text-sm leading-relaxed transition-colors min-h-[44px] cursor-pointer"
-                    >
-                      {ch.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {scenarioDone && (
+            {isShortAnswer && activeScenario ? (
               <form
                 onSubmit={handleSaveScenarioReflection}
                 className="p-4 rounded-xl bg-[#EAF2D7]/55 dark:bg-[#EAF2D7]/10 border border-[#8FB37C] space-y-3"
               >
+                <p className="text-sm sm:text-[15px] font-semibold leading-relaxed text-[#1D242B] dark:text-white">
+                  {activeScenario.shortAnswerPrompt}
+                </p>
+
+                {activeScenario.shortAnswerSuggestions &&
+                  activeScenario.shortAnswerSuggestions.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Gợi ý ý tưởng — chạm để chèn vào câu trả lời của em:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {activeScenario.shortAnswerSuggestions.map((sg) => (
+                          <button
+                            key={sg}
+                            type="button"
+                            onClick={() =>
+                              setScenarioReflection((prev) =>
+                                prev.trim() ? `${prev.trim()} ${sg}` : sg
+                              )
+                            }
+                            className="text-left min-h-[36px] px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] hover:border-[#E27396] text-xs leading-relaxed cursor-pointer"
+                          >
+                            {sg}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 <label
-                  htmlFor="scenario-reflection-input"
-                  className="block text-sm font-bold text-[#223A1E] dark:text-[#EAF2D7]"
+                  htmlFor="scenario-short-answer"
+                  className="block text-xs sm:text-sm font-semibold text-[#223A1E] dark:text-[#EAF2D7]"
                 >
-                  {activeScenario.reflectionPrompt}
+                  Câu trả lời của em
                 </label>
                 <textarea
-                  id="scenario-reflection-input"
-                  rows={2}
+                  id="scenario-short-answer"
+                  rows={4}
                   value={scenarioReflection}
                   onChange={(e) => setScenarioReflection(e.target.value)}
-                  placeholder="Ví dụ: Em thấy mình hợp với phần làm thực hành theo nhóm, nhưng còn ngại phần đứng xưởng lâu..."
+                  placeholder="Em viết ngắn gọn theo cách hiểu của mình..."
                   className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0F171E] p-3 text-sm"
                 />
+
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-slate-600 dark:text-slate-300">
-                    Không chấm điểm — câu trả lời giúp em hiểu rõ cảm giác thật của mình.
+                    Không chấm điểm — điều em viết giúp em hiểu rõ cảm giác thật của mình.
                   </span>
                   <button
                     type="submit"
                     disabled={!scenarioReflection.trim()}
                     className="min-h-[40px] px-4 py-2 rounded-xl bg-[#E27396] hover:bg-[#EA9AB2] disabled:opacity-50 text-[#1D1519] text-xs sm:text-sm font-semibold cursor-pointer"
                   >
-                    Lưu cảm nhận tình huống
+                    Lưu cảm nhận
                   </button>
                 </div>
               </form>
+            ) : (
+              <>
+                {currentNode && !scenarioDone && (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-sm sm:text-[15px] font-semibold leading-relaxed text-[#1D242B] dark:text-white">
+                      {currentNode.prompt}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {currentNode.choices.map((ch) => (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => handlePickScenarioChoice(ch)}
+                          className="text-left p-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] hover:border-[#E27396] hover:bg-[#EFCFE3]/20 text-sm leading-relaxed transition-colors min-h-[44px] cursor-pointer"
+                        >
+                          {ch.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {scenarioDone && (
+                  <form
+                    onSubmit={handleSaveScenarioReflection}
+                    className="p-4 rounded-xl bg-[#EAF2D7]/55 dark:bg-[#EAF2D7]/10 border border-[#8FB37C] space-y-3"
+                  >
+                    <label
+                      htmlFor="scenario-reflection-input"
+                      className="block text-sm font-bold text-[#223A1E] dark:text-[#EAF2D7]"
+                    >
+                      {activeScenario.reflectionPrompt}
+                    </label>
+                    <textarea
+                      id="scenario-reflection-input"
+                      rows={2}
+                      value={scenarioReflection}
+                      onChange={(e) => setScenarioReflection(e.target.value)}
+                      placeholder="Ví dụ: Em thấy mình hợp với phần làm thực hành theo nhóm, nhưng còn ngại phần đứng xưởng lâu..."
+                      className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0F171E] p-3 text-sm"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-slate-600 dark:text-slate-300">
+                        Không chấm điểm — câu trả lời giúp em hiểu rõ cảm giác thật của mình.
+                      </span>
+                      <button
+                        type="submit"
+                        disabled={!scenarioReflection.trim()}
+                        className="min-h-[40px] px-4 py-2 rounded-xl bg-[#E27396] hover:bg-[#EA9AB2] disabled:opacity-50 text-[#1D1519] text-xs sm:text-sm font-semibold cursor-pointer"
+                      >
+                        Lưu cảm nhận
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </>
             )}
 
             {scenarioSavedMsg && (
@@ -577,6 +644,64 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
               Xem chia sẻ từ cựu học sinh, chuẩn bị sẵn 2 câu hỏi khi gặp người làm nghề và đăng kí hoạt động thực tế.
             </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-2">
+          <h3 className="text-sm font-bold">
+            Hoạt động thực tế do nhà trường tổ chức ({experiences.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {experiences.map((act) => {
+              const joined = student.joinedExperienceIds.includes(act.id);
+              return (
+                <div
+                  key={act.id}
+                  className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 flex flex-col justify-between gap-4"
+                >
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-[#9D2950] dark:text-[#EA9AB2]">
+                      {act.activityType}
+                    </p>
+                    <h4 className="text-sm sm:text-base font-bold leading-snug">
+                      {act.title}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {act.description}
+                    </p>
+                    <div className="pt-1 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <p className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span>{act.dateLabel}</span>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span>{act.location}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleJoinActivity(act)}
+                    className={`w-full min-h-[42px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      joined
+                        ? "bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 text-[#223A1E] dark:text-[#EAF2D7]"
+                        : "bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42]"
+                    }`}
+                  >
+                    {joined ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Đã đăng kí / tham gia</span>
+                      </>
+                    ) : (
+                      <span>Đăng kí tham gia thử</span>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -680,64 +805,6 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
             </div>
           </div>
         )}
-
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-bold">
-            Hoạt động thực tế do nhà trường tổ chức ({experiences.length})
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {experiences.map((act) => {
-              const joined = student.joinedExperienceIds.includes(act.id);
-              return (
-                <div
-                  key={act.id}
-                  className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 flex flex-col justify-between gap-4"
-                >
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-[#9D2950] dark:text-[#EA9AB2]">
-                      {act.activityType}
-                    </p>
-                    <h4 className="text-sm sm:text-base font-bold leading-snug">
-                      {act.title}
-                    </h4>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                      {act.description}
-                    </p>
-                    <div className="pt-1 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      <p className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 shrink-0" />
-                        <span>{act.dateLabel}</span>
-                      </p>
-                      <p className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        <span>{act.location}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleJoinActivity(act)}
-                    className={`w-full min-h-[42px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                      joined
-                        ? "bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 text-[#223A1E] dark:text-[#EAF2D7]"
-                        : "bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42]"
-                    }`}
-                  >
-                    {joined ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Đã đăng kí / tham gia</span>
-                      </>
-                    ) : (
-                      <span>Đăng kí tham gia thử</span>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </section>
 
       {/* 1.3C & 1.4: Smart Journal + 3-Question Post-Experience Form + Timeline */}

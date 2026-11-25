@@ -208,7 +208,7 @@ export const RubricAssessment: React.FC<RubricAssessmentProps> = ({
             >
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.code} ({s.anonymizedLabel}) · Bước {s.currentStep}
+                  {s.fullName} · Bước {s.currentStep}
                 </option>
               ))}
             </select>
@@ -220,7 +220,7 @@ export const RubricAssessment: React.FC<RubricAssessmentProps> = ({
             className="min-h-[42px] px-4 py-2 rounded-xl bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42] text-xs sm:text-sm font-semibold inline-flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4" />
-            <span>Xuất CSV ẩn danh (45 HS)</span>
+            <span>Xuất CSV ({students.length} học sinh)</span>
           </button>
         </div>
       </div>
@@ -231,7 +231,7 @@ export const RubricAssessment: React.FC<RubricAssessmentProps> = ({
           <div className="flex items-center gap-2.5">
             <BarChart3 className="w-5 h-5 text-[#133C42] dark:text-[#B3DEE2]" />
             <h3 className="text-base sm:text-lg font-bold">
-              Biểu đồ đối chiếu Trước – Sau ({student.code}) · Đánh giá định tính theo thang mô tả
+              Biểu đồ đối chiếu Trước – Sau ({student.fullName}) · Đánh giá định tính theo thang mô tả
             </h3>
           </div>
           <div className="flex items-center gap-4 text-xs">
@@ -362,7 +362,7 @@ export const RubricAssessment: React.FC<RubricAssessmentProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-base sm:text-lg font-bold">
-              Cập nhật đánh giá &amp; minh chứng cho {student.code}
+              Cập nhật đánh giá &amp; minh chứng cho {student.fullName}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Tình trạng minh chứng ({periodTab === "before" ? "Lần Trước" : "Lần Sau"}): đã gắn cho {linkedEvidenceCount}/5 tiêu chí.

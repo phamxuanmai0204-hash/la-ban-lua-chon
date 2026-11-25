@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   CheckSquare,
   Square,
@@ -20,7 +20,14 @@ interface CommitFormProps {
   onTriggerAIChangeCheck: (newChoice: string) => Promise<void>;
   onRecognitionMessage: (msg: string) => void;
   onStepCompleted: (step: JourneyStep, message: string) => void;
+  focusSection?: "choice" | "plan" | "sheet";
 }
+
+const LETTER_PROMPTS = [
+  "Hôm nay mình chọn hướng đi này vì…",
+  "Điều mình mong nhất khi theo con đường này là…",
+  "Nếu một lúc nào đó mình dao động, mình sẽ tự nhắc mình rằng…",
+];
 
 export const CommitForm: React.FC<CommitFormProps> = ({
   student,
@@ -28,6 +35,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
   onTriggerAIChangeCheck,
   onRecognitionMessage,
   onStepCompleted,
+  focusSection,
 }) => {
   const { commitment } = student;
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -35,6 +43,20 @@ export const CommitForm: React.FC<CommitFormProps> = ({
   const [showChangePrompt, setShowChangePrompt] = useState(false);
   const [pendingNewChoice, setPendingNewChoice] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusSection) return;
+    const targetId =
+      focusSection === "choice"
+        ? "commit-choice-section"
+        : focusSection === "plan"
+        ? "commit-plan-section"
+        : "commit-sheet-section";
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focusSection]);
 
   const activeConsidered = student.consideredOptions.filter(
     (o) => o.status !== "Tạm gác lại"
@@ -236,7 +258,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
       )}
 
       {/* 1.5A: Choose option + Letter to Self + Pre-mortem */}
-      <section className="no-print bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+      <section
+        id="commit-choice-section"
+        className="no-print bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-base sm:text-lg font-bold">
@@ -389,22 +414,44 @@ export const CommitForm: React.FC<CommitFormProps> = ({
         )}
 
         {/* Thư gửi chính mình */}
-        <div className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 space-y-2">
+        <div className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 space-y-2.5">
           <label
             htmlFor="reason-own-words"
             className="text-sm font-bold flex items-center gap-2 text-[#1D242B] dark:text-white"
           >
             <Mail className="w-4 h-4 text-[#9D2950] dark:text-[#EA9AB2]" />
             <span>
-              Thư gửi chính mình – Lí do em chọn hướng đi này (bắt buộc trước khi chốt)
+              Thư gửi chính mình – em tự viết (bắt buộc trước khi chốt)
             </span>
           </label>
           <p className="text-xs text-slate-600 dark:text-slate-300">
-            Hãy viết như một lá thư ngắn gửi cho chính mình để sau này khi dao động, em nhớ lại vì sao hôm nay mình chọn con đường này.
+            Không có mẫu điền sẵn. Em tự viết một lá thư ngắn cho chính mình, dựa trên các câu hỏi gợi mở sau (chạm để chèn vào thư):
           </p>
+          <div className="flex flex-wrap gap-2">
+            {LETTER_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() =>
+                  onUpdateStudent({
+                    ...student,
+                    commitment: {
+                      ...commitment,
+                      reasonInOwnWords: commitment.reasonInOwnWords.trim()
+                        ? `${commitment.reasonInOwnWords.trim()} ${prompt}`
+                        : prompt,
+                    },
+                  })
+                }
+                className="text-left min-h-[36px] px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] hover:border-[#E27396] text-xs leading-relaxed cursor-pointer"
+              >
+                + {prompt}
+              </button>
+            ))}
+          </div>
           <textarea
             id="reason-own-words"
-            rows={3}
+            rows={4}
             value={commitment.reasonInOwnWords}
             onChange={(e) =>
               onUpdateStudent({
@@ -412,7 +459,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
                 commitment: { ...commitment, reasonInOwnWords: e.target.value },
               })
             }
-            placeholder="Gửi chính mình của vài tháng tới: Hôm nay mình chọn hướng đi này vì..."
+            placeholder="Em viết lá thư của mình ở đây..."
             className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] p-3.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E27396]"
           />
         </div>
@@ -448,7 +495,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
       </section>
 
       {/* 1.5B: Short-term action plan with due dates */}
-      <section className="no-print bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+      <section
+        id="commit-plan-section"
+        className="no-print bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4"
+      >
         <div>
           <h2 className="text-base sm:text-lg font-bold">
             2. Kế hoạch ngắn hạn – Những việc cần làm kèm hạn ngày
@@ -540,7 +590,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
       </section>
 
       {/* 1.5C: Electronic & Printable A4 Commitment Slip */}
-      <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+      <section
+        id="commit-sheet-section"
+        className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5"
+      >
         <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#EAF2D7] dark:bg-[#EAF2D7]/15 flex items-center justify-center text-[#223A1E] dark:text-[#EAF2D7]">
@@ -589,10 +642,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Học sinh (Kí hiệu ẩn danh):
+                Học sinh:
               </span>
               <p className="font-semibold">
-                {commitment.studentNamePlaceholder} · {student.code}
+                {commitment.studentFullName} · {student.fullName}
               </p>
             </div>
             <div>
@@ -614,7 +667,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({
 
           <div>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Thư gửi chính mình (Lí do lựa chọn bằng lời của em):
+              Thư gửi chính mình (em tự viết):
             </span>
             <p className="leading-relaxed mt-0.5">
               {commitment.reasonInOwnWords || "Chưa viết thư gửi chính mình"}

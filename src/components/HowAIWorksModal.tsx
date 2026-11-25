@@ -61,10 +61,10 @@ export const HowAIWorksModal: React.FC<HowAIWorksModalProps> = ({
           <div className="p-4 rounded-xl bg-[#B3DEE2]/35 dark:bg-[#B3DEE2]/10 border border-[#B3DEE2] dark:border-slate-700 space-y-1.5">
             <p className="font-bold text-[#133C42] dark:text-[#B3DEE2] flex items-center gap-2">
               <Lock className="w-4 h-4 shrink-0" />
-              <span>2. Ẩn danh thông tin cá nhân trước khi gửi</span>
+              <span>2. Thông tin cá nhân được bảo vệ trước khi gửi</span>
             </p>
             <p>
-              Trước khi kết nối tới máy chủ AI, ứng dụng tự động dùng kí hiệu ẩn danh (ví dụ: HS 01, HS 02) và loại bỏ tên riêng, số điện thoại hoặc địa chỉ nếu em vô tình gõ vào. Máy chủ AI chỉ nhận ngữ cảnh ẩn danh gồm tiêu chí tự đặt, bước đang đi và tóm tắt nhật ký gần nhất.
+              Trước khi kết nối tới máy chủ AI, ứng dụng tự động thay họ tên, số điện thoại và địa chỉ (nếu em vô tình gõ vào) bằng kí hiệu chung. Máy chủ AI chỉ nhận ngữ cảnh cần thiết gồm tiêu chí tự đặt, bước đang đi và tóm tắt nhật ký gần nhất.
             </p>
           </div>
 

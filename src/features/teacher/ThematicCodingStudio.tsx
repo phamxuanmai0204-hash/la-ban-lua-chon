@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { requestThematicCoding } from "../../services/ai";
 import { exportThematicCodesCSV } from "../../services/export";
-import { anDanhHoa } from "../../services/safety";
 import type { Student, ThematicCodeItem } from "../../types";
 
 interface ThematicCodingStudioProps {
@@ -30,27 +29,17 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
       stu.journal.map((j) => ({
         journalId: j.id,
         studentId: stu.id,
-        studentCode: stu.anonymizedLabel || stu.code,
-        isFocusGroup: stu.isFocusGroup,
+        studentName: stu.fullName,
         date: j.date,
         activityType: j.activityType,
-        content: anDanhHoa(j.content, stu.anonymizedLabel || stu.code),
+        content: j.content,
       }))
     );
   }, [students]);
 
-  const [onlyFocusGroup, setOnlyFocusGroup] = useState(true);
-  const visibleEntries = useMemo(() => {
-    return allJournalEntries.filter((e) =>
-      onlyFocusGroup ? e.isFocusGroup : true
-    );
-  }, [allJournalEntries, onlyFocusGroup]);
-
+  const visibleEntries = allJournalEntries;
   const [selectedJournalIds, setSelectedJournalIds] = useState<string[]>(() =>
-    allJournalEntries
-      .filter((e) => e.isFocusGroup)
-      .slice(0, 6)
-      .map((e) => e.journalId)
+    allJournalEntries.slice(0, 6).map((e) => e.journalId)
   );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -63,7 +52,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
   const [manualTheme, setManualTheme] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [manualQuote, setManualQuote] = useState("");
-  const [manualSource, setManualSource] = useState("HS 01 · Nhật ký");
+  const [manualSource, setManualSource] = useState("");
 
   const toggleSelectJournal = (journalId: string) => {
     setSelectedJournalIds((prev) =>
@@ -92,7 +81,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
       selectedJournalIds.includes(e.journalId)
     );
     if (chosen.length === 0) {
-      setErrorMsg("Thầy/cô hãy chọn ít nhất một mục nhật ký ẩn danh để phân tích.");
+      setErrorMsg("Thầy/cô hãy chọn ít nhất một mục nhật ký để phân tích.");
       return;
     }
 
@@ -107,7 +96,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
         evidenceQuote: s.evidenceQuote,
         sourceLabel: s.sourceLabel,
         journalId: s.journalId,
-        studentCode: s.studentCode,
+        studentName: s.studentName,
         status: "pending",
         aiGenerated: true,
       }));
@@ -168,7 +157,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
       evidenceQuote: manualQuote.trim(),
       sourceLabel: manualSource.trim() || "Giáo viên ghi nhận",
       journalId: "manual",
-      studentCode: manualSource.split("·")[0]?.trim() || "HS Ẩn danh",
+      studentName: "Giáo viên ghi nhận",
       status: "accepted",
       aiGenerated: false,
     };
@@ -201,7 +190,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
                 Hỗ trợ mã hóa chủ đề (Braun &amp; Clarke, 2006)
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-                Chọn các mục nhật ký đã ẩn danh để AI đề xuất mã ban đầu và câu minh chứng. Thầy/cô luôn là người Chấp nhận, Sửa hoặc Bỏ trước khi gom chủ đề và xuất CSV.
+                Chọn các mục nhật ký để AI đề xuất mã ban đầu và câu minh chứng. Thầy/cô luôn là người Chấp nhận, Sửa hoặc Bỏ trước khi gom chủ đề và xuất CSV.
               </p>
             </div>
           </div>
@@ -221,24 +210,13 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Step 1: Select anonymized journals */}
+        {/* Step 1: Select journals */}
         <section className="lg:col-span-5 bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-bold">
-              1. Chọn nhật ký ẩn danh ({selectedJournalIds.length} đã chọn)
+              1. Chọn nhật ký học sinh ({selectedJournalIds.length} đã chọn)
             </h2>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setOnlyFocusGroup(!onlyFocusGroup)}
-                className={`min-h-[34px] px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer ${
-                  onlyFocusGroup
-                    ? "bg-[#EFCFE3]/50 border-[#E27396] text-[#4A1A2C] dark:text-[#EFCFE3]"
-                    : "border-slate-300 dark:border-slate-700"
-                }`}
-              >
-                {onlyFocusGroup ? "Nhóm trọng tâm" : "Cả lớp"}
-              </button>
               <button
                 type="button"
                 onClick={handleSelectAllVisible}
@@ -270,7 +248,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
                     />
                     <div className="space-y-1">
                       <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        {entry.studentCode} · {entry.activityType} ·{" "}
+                        {entry.studentName} · {entry.activityType} ·{" "}
                         <span className="tabular-nums">{entry.date}</span>
                       </p>
                       <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">
@@ -482,7 +460,7 @@ export const ThematicCodingStudio: React.FC<ThematicCodingStudioProps> = ({
                 type="text"
                 value={manualSource}
                 onChange={(e) => setManualSource(e.target.value)}
-                placeholder="Nguồn (vd: HS 01 · Nhật ký)"
+                placeholder="Nguồn (vd: Nguyễn Văn A · Nhật ký)"
                 className="min-h-[38px] rounded-lg border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3 py-1.5 text-xs"
               />
             </div>

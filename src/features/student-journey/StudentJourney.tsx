@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Compass,
   User,
@@ -37,7 +37,11 @@ import { AIChat } from "../ai-assistant/AIChat";
 import { CommitForm } from "../commit/CommitForm";
 import { RubricAssessment } from "../teacher/RubricAssessment";
 import { JourneyCompassSVG } from "./JourneyCompassSVG";
-import { DEMO_PARENT_PIN } from "../../data/schoolClasses";
+import { StudentSummaryReport } from "./StudentSummaryReport";
+import {
+  allStepsCompleted,
+  buildStudentSummary,
+} from "../../utils/studentSummary";
 import type {
   AIMessage,
   AppSettings,
@@ -106,6 +110,9 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
   onChangeParentPin,
 }) => {
   const [activeTab, setActiveTab] = useState<StudentTab>("overview");
+  const [commitFocus, setCommitFocus] = useState<"choice" | "plan" | "sheet">(
+    "choice"
+  );
   const [pinCopied, setPinCopied] = useState(false);
   const [editingPin, setEditingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
@@ -129,9 +136,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
   };
 
   const isStudentAccount = account?.role === "student";
-  const parentPin = isStudentAccount
-    ? account?.parentPin || DEMO_PARENT_PIN
-    : DEMO_PARENT_PIN;
+  const parentPin = account?.parentPin ?? "";
   const canChangePin = Boolean(isStudentAccount && onChangeParentPin);
 
   const handleCopyPin = async () => {
@@ -184,6 +189,18 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
     (o) => o.status !== "Tạm gác lại"
   );
 
+  // AI auto-compiles the 6-part summary once every journey step is finished
+  useEffect(() => {
+    if (student.summary) return;
+    if (!allStepsCompleted(student)) return;
+    const summary = buildStudentSummary(student, aiMessages, experiences);
+    onUpdateStudent({
+      ...student,
+      currentStep: "CAM KẾT",
+      summary,
+    });
+  }, [student, aiMessages, experiences, onUpdateStudent]);
+
   const dueTasks = useMemo(() => {
     const todayMs = new Date().setHours(0, 0, 0, 0);
     return student.commitment.actionPlan.filter((t) => {
@@ -215,7 +232,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
       return {
         title: "Chọn tối đa 3 hướng đi đưa vào danh sách cân nhắc",
         detail:
-          "Mở Bản đồ lộ trình để đọc điều kiện đầu vào và đường liên thông rồi chọn ra các phương án vừa sức.",
+          "Mở Bản đồ lộ trình để đọc điều kiện đầu vào và cơ hội học tiếp rồi chọn ra các phương án vừa sức.",
         buttonLabel: "Mở Bản đồ lộ trình",
         targetTab: "pathways",
       };
@@ -425,6 +442,8 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
   };
 
   const handleCompassStepSelect = (step: JourneyStep) => {
+    if (step === "CHỐT") setCommitFocus("choice");
+    if (step === "CAM KẾT") setCommitFocus("plan");
     const targetTab: StudentTab =
       step === "THU"
         ? "pathways"
@@ -463,25 +482,29 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
             className="hidden md:flex items-center gap-5 text-sm font-medium text-slate-600 dark:text-slate-300"
           >
             {[
-              { id: "overview", label: "Hành trình" },
-              { id: "profile", label: "Bản thân" },
-              { id: "pathways", label: "Lộ trình" },
-              { id: "filter", label: "Bộ lọc" },
-              { id: "commit", label: "Chốt & Cam kết" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveTab(item.id as StudentTab)}
-                className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
-                  activeTab === item.id
-                    ? "border-[#E27396] text-[#1D242B] dark:text-white font-semibold"
-                    : "border-transparent hover:text-[#1D242B] dark:hover:text-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+              { id: "profile", label: "Soi chiếu bản thân" },
+              { id: "pathways", label: "Lộ trình 5 bước" },
+              { id: "commit", label: "Phiếu cam kết" },
+            ].map((item) => {
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    if (item.id === "commit") setCommitFocus("sheet");
+                    setActiveTab(item.id as StudentTab);
+                  }}
+                  className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
+                    active
+                      ? "border-[#E27396] text-[#1D242B] dark:text-white font-semibold"
+                      : "border-transparent hover:text-[#1D242B] dark:hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -509,7 +532,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
           <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-200">
             <span className="font-semibold">
-              {student.code} ({student.anonymizedLabel})
+              {student.fullName}
             </span>
             <span aria-hidden="true">·</span>
             <span>Lớp {student.className}</span>
@@ -627,50 +650,186 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
       </div>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Tabs bar */}
-        <div
-          role="tablist"
-          aria-label="Các mục trong hành trình học sinh"
-          className="no-print flex flex-wrap gap-2"
-        >
-          {[
-            { id: "overview", label: "La bàn hành trình", icon: Compass },
-            { id: "profile", label: "Soi chiếu bản thân", icon: User },
-            { id: "pathways", label: "Bản đồ lộ trình (THU)", icon: Map },
-            { id: "filter", label: "Bộ lọc đủ tốt (LỌC)", icon: Filter },
-            {
-              id: "try_journal",
-              label: "Thử & Nhật ký (THỬ)",
-              icon: BookOpen,
-            },
-            { id: "commit", label: "Chốt & Cam kết", icon: FileCheck2 },
-            {
-              id: "ai_chat",
-              label: `Trợ lí đặt câu hỏi (${studentAIMessagesCount})`,
-              icon: MessageCircle,
-            },
-            { id: "self_eval", label: "Tự đánh giá", icon: ClipboardCheck },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={active}
-                type="button"
-                onClick={() => setActiveTab(tab.id as StudentTab)}
-                className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
-                  active
-                    ? "bg-[#B3DEE2] dark:bg-[#B3DEE2]/20 border-[#63AEB6] text-[#133C42] dark:text-white font-semibold"
-                    : "bg-white dark:bg-[#17222C] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-[#EA9AB2]"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="whitespace-nowrap">{tab.label}</span>
-              </button>
-            );
-          })}
+        {/* Thanh công cụ: Soi chiếu bản thân → Lộ trình 5 bước → Phiếu cam kết & A4 */}
+        <div className="no-print space-y-2.5">
+          <div
+            role="tablist"
+            aria-label="Thanh công cụ hành trình học sinh"
+            className="flex flex-wrap gap-2"
+          >
+            <button
+              role="tab"
+              aria-selected={activeTab === "profile"}
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                activeTab === "profile"
+                  ? "bg-[#B3DEE2] dark:bg-[#B3DEE2]/20 border-[#63AEB6] text-[#133C42] dark:text-white"
+                  : "bg-white dark:bg-[#17222C] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-[#EA9AB2]"
+              }`}
+            >
+              <User className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">1. Soi chiếu bản thân</span>
+            </button>
+
+            <button
+              role="tab"
+              aria-selected={
+                activeTab === "pathways" ||
+                activeTab === "filter" ||
+                activeTab === "try_journal" ||
+                activeTab === "commit"
+              }
+              type="button"
+              onClick={() => {
+                if (
+                  activeTab !== "pathways" &&
+                  activeTab !== "filter" &&
+                  activeTab !== "try_journal" &&
+                  activeTab !== "commit"
+                ) {
+                  setActiveTab("pathways");
+                }
+              }}
+              className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                activeTab === "pathways" ||
+                activeTab === "filter" ||
+                activeTab === "try_journal" ||
+                activeTab === "commit"
+                  ? "bg-[#B3DEE2] dark:bg-[#B3DEE2]/20 border-[#63AEB6] text-[#133C42] dark:text-white"
+                  : "bg-white dark:bg-[#17222C] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-[#EA9AB2]"
+              }`}
+            >
+              <Compass className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">
+                2. Lộ trình 5 bước (THU–LỌC–THỬ–CHỐT–CAM KẾT)
+              </span>
+            </button>
+
+            <button
+              role="tab"
+              aria-selected={activeTab === "commit" && commitFocus === "sheet"}
+              type="button"
+              onClick={() => {
+                setCommitFocus("sheet");
+                setActiveTab("commit");
+              }}
+              className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                activeTab === "commit" && commitFocus === "sheet"
+                  ? "bg-[#EFCFE3]/70 dark:bg-[#EFCFE3]/15 border-[#E27396] text-[#4A1A2C] dark:text-[#EFCFE3]"
+                  : "bg-white dark:bg-[#17222C] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-[#EA9AB2]"
+              }`}
+            >
+              <FileCheck2 className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">
+                3. Phiếu cam kết điện tử &amp; Bản in A4
+              </span>
+            </button>
+          </div>
+
+          {(activeTab === "pathways" ||
+            activeTab === "filter" ||
+            activeTab === "try_journal" ||
+            activeTab === "commit") && (
+            <div
+              role="tablist"
+              aria-label="Năm bước của lộ trình"
+              className="flex flex-wrap items-center gap-2 pl-1"
+            >
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Lộ trình 5 bước:
+              </span>
+              {[
+                {
+                  id: "THU" as JourneyStep,
+                  tab: "pathways" as StudentTab,
+                  label: "THU · Thu thập",
+                  icon: Map,
+                  focus: null,
+                },
+                {
+                  id: "LỌC" as JourneyStep,
+                  tab: "filter" as StudentTab,
+                  label: "LỌC · Đủ tốt",
+                  icon: Filter,
+                  focus: null,
+                },
+                {
+                  id: "THỬ" as JourneyStep,
+                  tab: "try_journal" as StudentTab,
+                  label: "THỬ · Trải nghiệm",
+                  icon: BookOpen,
+                  focus: null,
+                },
+                {
+                  id: "CHỐT" as JourneyStep,
+                  tab: "commit" as StudentTab,
+                  label: "CHỐT · Chọn hướng",
+                  icon: FileCheck2,
+                  focus: "choice" as const,
+                },
+                {
+                  id: "CAM KẾT" as JourneyStep,
+                  tab: "commit" as StudentTab,
+                  label: "CAM KẾT · Ký cam kết",
+                  icon: ClipboardCheck,
+                  focus: "plan" as const,
+                },
+              ].map((step) => {
+                const Icon = step.icon;
+                const active =
+                  activeTab === step.tab &&
+                  (step.tab !== "commit" || commitFocus === step.focus);
+                return (
+                  <button
+                    key={step.id}
+                    role="tab"
+                    aria-selected={active}
+                    type="button"
+                    onClick={() => {
+                      if (step.focus) setCommitFocus(step.focus);
+                      setActiveTab(step.tab);
+                    }}
+                    className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                      active
+                        ? "bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 border-[#8FB37C] text-[#223A1E] dark:text-[#EAF2D7]"
+                        : "bg-white dark:bg-[#17222C] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="whitespace-nowrap">{step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pl-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab("ai_chat")}
+              className={`min-h-[32px] px-2.5 py-1 rounded-lg border inline-flex items-center gap-1.5 cursor-pointer ${
+                activeTab === "ai_chat"
+                  ? "border-[#8FB37C] bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 text-[#223A1E] dark:text-[#EAF2D7] font-semibold"
+                  : "border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C] text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>Trợ lí đặt câu hỏi ({studentAIMessagesCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("self_eval")}
+              className={`min-h-[32px] px-2.5 py-1 rounded-lg border inline-flex items-center gap-1.5 cursor-pointer ${
+                activeTab === "self_eval"
+                  ? "border-[#8FB37C] bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 text-[#223A1E] dark:text-[#EAF2D7] font-semibold"
+                  : "border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C] text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              <span>Tự đánh giá 4 mức</span>
+            </button>
+          </div>
         </div>
 
         {/* Specific competence-supporting recognition banner */}
@@ -701,7 +860,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
               <div className="lg:col-span-7 space-y-5">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2]">
-                    La bàn của {student.code} · Bấm vào từng cung để mở bước tương ứng
+                    La bàn của {student.fullName} · Bấm vào từng cung để mở bước tương ứng
                   </p>
                   <h1 className="text-xl sm:text-2xl font-bold leading-snug">
                     Em đang ở bước {student.currentStep}. Đi từng bước vừa sức để chọn điều phù hợp với mình.
@@ -721,7 +880,16 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setActiveTab(nextSingleAction.targetTab)}
+                    onClick={() => {
+                      if (nextSingleAction.targetTab === "commit") {
+                        setCommitFocus(
+                          student.commitment.studentConfirmedAt
+                            ? "plan"
+                            : "choice"
+                        );
+                      }
+                      setActiveTab(nextSingleAction.targetTab);
+                    }}
                     className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#E27396] hover:bg-[#EA9AB2] text-[#1D1519] text-sm font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
                   >
                     <span>{nextSingleAction.buttonLabel}</span>
@@ -739,7 +907,10 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setActiveTab("commit")}
+                      onClick={() => {
+                        setCommitFocus("plan");
+                        setActiveTab("commit");
+                      }}
                       className="font-semibold text-[#133C42] dark:text-[#B3DEE2] hover:underline shrink-0 cursor-pointer"
                     >
                       Xem ngay
@@ -774,9 +945,11 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                     className="min-h-[48px] p-4 rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border border-[#B3DEE2] dark:border-slate-700 text-left flex items-center justify-between gap-2 hover:bg-[#EAF2D7] transition-colors cursor-pointer"
                   >
                     <div>
-                      <p className="text-sm font-bold">2. Bản đồ lộ trình (THU)</p>
+                      <p className="text-sm font-bold">
+                        2. Lộ trình 5 bước (THU–LỌC–THỬ–CHỐT–CAM KẾT)
+                      </p>
                       <p className="text-xs text-slate-600 dark:text-slate-300">
-                        THPT · GDTX · Nghề &amp; Liên thông
+                        Đang ở bước {student.currentStep} · {activeOptions.length}/3 phương án
                       </p>
                     </div>
                     <ArrowRight className="w-4 h-4 shrink-0" />
@@ -784,27 +957,20 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setActiveTab("filter")}
-                    className="min-h-[48px] p-4 rounded-xl bg-[#EFCFE3]/45 dark:bg-[#EFCFE3]/10 border border-[#EA9AB2] dark:border-slate-700 text-left flex items-center justify-between gap-2 hover:bg-[#EFCFE3]/70 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setCommitFocus("sheet");
+                      setActiveTab("commit");
+                    }}
+                    className="sm:col-span-2 min-h-[48px] p-4 rounded-xl bg-[#EFCFE3]/45 dark:bg-[#EFCFE3]/10 border border-[#EA9AB2] dark:border-slate-700 text-left flex items-center justify-between gap-2 hover:bg-[#EFCFE3]/70 transition-colors cursor-pointer"
                   >
                     <div>
-                      <p className="text-sm font-bold">3. Bộ lọc &ldquo;Đủ tốt&rdquo;</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-300">
-                        {student.criteria.length} tiêu chí · {activeOptions.length}/3 phương án
+                      <p className="text-sm font-bold">
+                        3. Phiếu cam kết điện tử &amp; Bản in A4
                       </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 shrink-0" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("try_journal")}
-                    className="min-h-[48px] p-4 rounded-xl bg-white dark:bg-[#0F171E] border border-slate-300 dark:border-slate-700 text-left flex items-center justify-between gap-2 hover:border-[#E27396] transition-colors cursor-pointer"
-                  >
-                    <div>
-                      <p className="text-sm font-bold">4. Thử &amp; Nhật ký</p>
                       <p className="text-xs text-slate-600 dark:text-slate-300">
-                        {student.journal.length} trang nhật ký đã viết
+                        {student.commitment.studentConfirmedAt
+                          ? `Em đã xác nhận lúc ${student.commitment.studentConfirmedAt}`
+                          : "Tự động tổng hợp từ hành trình, sẵn sàng in A4 để kí tay"}
                       </p>
                     </div>
                     <ArrowRight className="w-4 h-4 shrink-0" />
@@ -832,13 +998,6 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                       Chia sẻ mã này cho ba mẹ để liên kết hồ sơ của em ở vai Phụ
                       huynh.
                     </p>
-
-                    {!isStudentAccount && (
-                      <p className="text-xs text-[#9D2950] dark:text-[#EA9AB2]">
-                        Hồ sơ mẫu dùng mã {DEMO_PARENT_PIN}. Đăng nhập bằng tài
-                        khoản thật để nhận và đổi mã riêng của em.
-                      </p>
-                    )}
 
                     <div className="flex flex-wrap items-center gap-2">
                       <button
@@ -987,6 +1146,13 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                 </div>
               </div>
             </div>
+
+            {student.summary && (
+              <StudentSummaryReport
+                summary={student.summary}
+                audience="student"
+              />
+            )}
           </div>
         )}
 
@@ -1042,6 +1208,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
         {activeTab === "commit" && (
           <CommitForm
             student={student}
+            focusSection={commitFocus}
             onUpdateStudent={onUpdateStudent}
             onTriggerAIChangeCheck={async (newChoice) => {
               await onTriggerAIQuestion({
@@ -1126,10 +1293,10 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
               <div className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200/80 dark:border-slate-800 space-y-1.5">
                 <p>
                   <span className="text-slate-500 dark:text-slate-400">
-                    Mã ẩn danh thống nhất:
+                    Họ và tên:
                   </span>{" "}
                   <strong className="text-[#133C42] dark:text-[#B3DEE2]">
-                    {student.anonymizedLabel} ({student.code})
+                    {student.fullName}
                   </strong>
                 </p>
                 <p>
@@ -1158,7 +1325,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                   <strong className="tabular-nums">
                     {student.dataDeletionRequestedAt}
                   </strong>
-                  . Giáo viên phụ trách đã nhận được thông báo để xử lí ẩn danh hoàn toàn hoặc xóa bản ghi của em.
+                  . Giáo viên phụ trách đã nhận được thông báo để xóa bản ghi của em khỏi hệ thống.
                 </div>
               )}
 
@@ -1174,7 +1341,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                   onClick={() => {
                     exportStudentPersonalDataJSON(student, aiMessages, meetings);
                     setPrivacyStatusMsg(
-                      `Đã tải xuống tệp dữ liệu cá nhân ẩn danh (${student.anonymizedLabel}).`
+                      `Đã tải xuống tệp dữ liệu cá nhân của ${student.fullName}.`
                     );
                   }}
                   className="flex-1 min-h-[42px] px-4 py-2 rounded-xl bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42] text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 cursor-pointer"
@@ -1204,7 +1371,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
                     Em muốn gửi yêu cầu xóa dữ liệu cá nhân trong hệ thống?
                   </p>
                   <p className="text-slate-600 dark:text-slate-300">
-                    Nếu em xác nhận, nhật ký và dữ liệu hành trình của {student.anonymizedLabel} sẽ được đánh dấu chờ thầy/cô xóa hẳn khỏi danh sách nghiên cứu. Em có thể tải dữ liệu về trước khi xác nhận.
+                    Nếu em xác nhận, nhật ký và dữ liệu hành trình của {student.fullName} sẽ được đánh dấu chờ thầy/cô xóa hẳn khỏi hệ thống. Em có thể tải dữ liệu về trước khi xác nhận.
                   </p>
                   <div className="flex justify-end gap-2">
                     <button
@@ -1252,19 +1419,34 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
         className="no-print md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 bg-white/95 dark:bg-[#17222C]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 grid grid-cols-5 items-center"
       >
         {[
-          { id: "overview", label: "La bàn", icon: Compass },
-          { id: "pathways", label: "Thu", icon: Map },
-          { id: "filter", label: "Lọc", icon: Filter },
-          { id: "try_journal", label: "Thử", icon: BookOpen },
-          { id: "commit", label: "Chốt", icon: FileCheck2 },
+          { id: "overview", label: "La bàn", icon: Compass, focus: null },
+          { id: "profile", label: "Soi chiếu", icon: User, focus: null },
+          { id: "pathways", label: "Lộ trình", icon: Map, focus: null },
+          {
+            id: "commit",
+            label: "Chốt",
+            icon: FileCheck2,
+            focus: "choice" as const,
+          },
+          {
+            id: "commit",
+            label: "Phiếu A4",
+            icon: ClipboardCheck,
+            focus: "sheet" as const,
+          },
         ].map((item) => {
           const Icon = item.icon;
-          const active = activeTab === item.id;
+          const active =
+            activeTab === item.id &&
+            (item.id !== "commit" || commitFocus === item.focus);
           return (
             <button
-              key={item.id}
+              key={`${item.id}-${item.label}`}
               type="button"
-              onClick={() => setActiveTab(item.id as StudentTab)}
+              onClick={() => {
+                if (item.focus) setCommitFocus(item.focus);
+                setActiveTab(item.id as StudentTab);
+              }}
               className={`flex flex-col items-center justify-center h-full gap-0.5 text-[11px] font-medium cursor-pointer ${
                 active
                   ? "text-[#9D2950] dark:text-[#EA9AB2] font-semibold"

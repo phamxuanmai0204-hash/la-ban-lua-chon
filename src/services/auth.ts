@@ -5,7 +5,6 @@ import type {
   LoginAccountInput,
   RegisterAccountInput,
   Role,
-  Student,
 } from "../types";
 import {
   normalizeUsername,
@@ -15,14 +14,13 @@ import {
   type AuthField,
 } from "./authValidation";
 import {
-  DEMO_PARENT_PIN,
+  DEFAULT_CLASS_ID,
   MAX_CHILDREN_PER_PARENT,
   SCHOOL_CLASSES,
+  normalizeClassId,
   type RosterClass,
   type SchoolRoster,
-  type SchoolStats,
 } from "../data/schoolClasses";
-import { createInitialAppState } from "../data/mockData";
 
 const AUTH_SESSION_KEY = "la_ban_v2:auth_session";
 const AUTH_ACCOUNTS_KEY = "la_ban_v2:auth_accounts";
@@ -211,7 +209,7 @@ function buildLocalSession(account: LocalAccountRecord): AuthSession {
     createdAt: account.createdAt,
   };
   if (account.role === "student") {
-    user.className = account.className;
+    user.className = normalizeClassId();
     user.parentPin = account.parentPin;
   }
   if (account.role === "parent") {
@@ -241,8 +239,7 @@ function isAuthSession(value: unknown): value is AuthSession {
     typeof user.username === "string" &&
     (user.role === "student" ||
       user.role === "teacher" ||
-      user.role === "parent" ||
-      user.role === "school_admin") &&
+      user.role === "parent") &&
     typeof user.createdAt === "string"
   );
 }
@@ -341,74 +338,42 @@ function assertSessionPayload(payload: unknown): AuthSession {
   return payload;
 }
 
-let demoStudentsCache: Student[] | null = null;
-
-function demoStudents(): Student[] {
-  if (!demoStudentsCache) {
-    demoStudentsCache = createInitialAppState().students;
-  }
-  return demoStudentsCache;
-}
-
 /**
- * Roster dự phòng khi không có máy chủ: học sinh mẫu + tài khoản lưu trên máy.
+ * Danh sách học sinh đã đăng ký trên thiết bị này (dùng khi không có máy chủ).
+ * Không còn dữ liệu mẫu: mọi học sinh đều do chính người dùng đăng ký.
  */
-export function buildLocalRoster(students?: Student[]): SchoolRoster {
-  const source = students && students.length > 0 ? students : demoStudents();
+export function buildLocalRoster(): SchoolRoster {
   const classes: RosterClass[] = SCHOOL_CLASSES.map((option) => ({
     id: option.id,
     label: option.label,
-    students: source
-      .filter((student) => student.className === option.id)
-      .map((student) => ({
-        id: student.id,
-        displayName: `${student.code} (${student.anonymizedLabel})`,
-        source: "demo" as const,
-      })),
+    students: [],
   }));
 
   for (const account of readLocalAccounts()) {
-    if (account.role !== "student" || !account.className) continue;
-    const target = classes.find((cls) => cls.id === account.className);
-    if (!target) continue;
-    if (target.students.some((s) => s.id === `acc:${account.id}`)) continue;
-    target.students.push({
+    if (account.role !== "student") continue;
+    classes[0]?.students.push({
       id: `acc:${account.id}`,
-      displayName: account.fullName,
+      fullName: account.fullName,
       source: "account",
     });
   }
 
-  return { classes, demoPin: DEMO_PARENT_PIN };
+  return { classes };
 }
 
-export async function fetchSchoolRoster(
-  fallbackStudents?: Student[]
-): Promise<SchoolRoster> {
-  if (!isOnline()) return buildLocalRoster(fallbackStudents);
+export async function fetchSchoolRoster(): Promise<SchoolRoster> {
+  if (!isOnline()) return buildLocalRoster();
   try {
     const payload = await apiRequest<SchoolRoster>("/roster", {
       method: "GET",
       base: SCHOOL_API_BASE,
     });
     if (!payload || !Array.isArray(payload.classes)) {
-      return buildLocalRoster(fallbackStudents);
+      return buildLocalRoster();
     }
     return payload;
   } catch {
-    return buildLocalRoster(fallbackStudents);
-  }
-}
-
-export async function fetchSchoolStats(): Promise<SchoolStats | null> {
-  if (!isOnline()) return null;
-  try {
-    return await apiRequest<SchoolStats>("/stats", {
-      method: "GET",
-      base: SCHOOL_API_BASE,
-    });
-  } catch {
-    return null;
+    return buildLocalRoster();
   }
 }
 
@@ -419,22 +384,14 @@ interface LocalLinkTarget {
 }
 
 function findLocalLinkTarget(studentId: string): LocalLinkTarget | null {
-  const demo = demoStudents().find((s) => s.id === studentId);
-  if (demo) {
-    return {
-      studentId,
-      className: demo.className,
-      displayName: `${demo.code} (${demo.anonymizedLabel})`,
-    };
-  }
   if (studentId.startsWith("acc:")) {
     const account = readLocalAccounts().find(
       (a) => a.id === studentId.slice("acc:".length) && a.role === "student"
     );
-    if (account?.className) {
+    if (account) {
       return {
         studentId,
-        className: account.className,
+        className: DEFAULT_CLASS_ID,
         displayName: account.fullName,
       };
     }
@@ -444,13 +401,11 @@ function findLocalLinkTarget(studentId: string): LocalLinkTarget | null {
 
 function verifyLocalLinkPin(target: LocalLinkTarget, pin: string): boolean {
   if (!PIN_PATTERN.test(pin)) return false;
-  if (target.studentId.startsWith("acc:")) {
-    const account = readLocalAccounts().find(
-      (a) => a.id === target.studentId.slice("acc:".length)
-    );
-    return Boolean(account?.parentPin) && account?.parentPin === pin;
-  }
-  return pin === DEMO_PARENT_PIN;
+  if (!target.studentId.startsWith("acc:")) return false;
+  const account = readLocalAccounts().find(
+    (a) => a.id === target.studentId.slice("acc:".length)
+  );
+  return Boolean(account?.parentPin) && account?.parentPin === pin;
 }
 
 /**
@@ -491,7 +446,7 @@ export async function addParentLink(
       const payload = await apiRequest<{ user?: AuthUser }>("/parent-links", {
         method: "POST",
         token: session.token,
-        body: { classId: input.classId, studentId: input.studentId, pin },
+        body: { classId: normalizeClassId(), studentId: input.studentId, pin },
       });
       if (payload?.user && isAuthSession({ token: session.token, user: payload.user })) {
         const next: AuthSession = { token: session.token, user: payload.user };
@@ -593,10 +548,8 @@ export async function registerAccount(
     ...input,
     fullName: input.fullName.trim(),
     username: normalizeUsername(input.username),
-    className: input.role === "student" ? input.className : undefined,
+    className: input.role === "student" ? normalizeClassId() : undefined,
     parentPin: input.role === "student" ? input.parentPin?.trim() : undefined,
-    childClassName:
-      input.role === "parent" ? input.childClassName : undefined,
     childStudentId:
       input.role === "parent" ? input.childStudentId : undefined,
     childPin: input.role === "parent" ? input.childPin?.trim() : undefined,

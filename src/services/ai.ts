@@ -1,5 +1,4 @@
 import { describeBehavioralSignals } from "../data/mockData";
-import { anDanhHoa } from "./safety";
 import type { AIQuestionType, JourneyStep, Student } from "../types";
 
 export interface JournalContextItem {
@@ -53,31 +52,28 @@ export function detectHesitancyPhrase(text: string): string | null {
 }
 
 /**
- * Builds compact, anonymized context before leaving the browser.
+ * Builds compact context before leaving the browser.
  */
 export function buildCompactAIContext(
   student: Student,
   studentMessage: string,
   triggerReason: string
 ): AskAIParams {
-  const code = student.anonymizedLabel || student.code;
   return {
-    studentCode: `${student.code} (${code})`,
-    studentMessage: anDanhHoa(studentMessage, code),
+    studentCode: student.fullName,
+    studentMessage,
     triggerReason,
     currentStep: student.currentStep,
-    criteria: student.criteria.map((c) => anDanhHoa(c.label, code)),
+    criteria: student.criteria.map((c) => c.label),
     consideredOptions: student.consideredOptions
       .filter((o) => o.status !== "Tạm gác lại")
-      .map((o) => anDanhHoa(o.title, code)),
-    committedOption: student.commitment.chosenOption
-      ? anDanhHoa(student.commitment.chosenOption, code)
-      : null,
+      .map((o) => o.title),
+    committedOption: student.commitment.chosenOption || null,
     deadlineDate: student.commitment.deadlineDate,
     recentJournals: student.journal.slice(0, 3).map((j) => ({
       date: j.date,
       activityType: j.activityType,
-      content: anDanhHoa(j.content, code),
+      content: j.content,
     })),
     behavioralSignals: describeBehavioralSignals(student.signals),
   };
@@ -167,7 +163,6 @@ export interface JourneySummaryResponse {
 export async function requestTeacherJourneySummary(
   student: Student
 ): Promise<JourneySummaryResponse> {
-  const code = student.anonymizedLabel || student.code;
   const conditionsSummary = [
     student.profile.conditions.commuteDistance,
     student.profile.conditions.familyFinance,
@@ -180,26 +175,24 @@ export async function requestTeacherJourneySummary(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      studentCode: `${student.code} (${code})`,
+      studentCode: student.fullName,
       currentStep: student.currentStep,
       completedSteps: student.completedSteps || [],
-      abilitiesTeacherNote: anDanhHoa(student.profile.abilitiesTeacherNote, code),
-      abilitiesStudentSelf: anDanhHoa(student.profile.abilitiesStudentSelf, code),
-      hollandSummary: anDanhHoa(student.profile.hollandSummaryText, code),
-      conditionsSummary: anDanhHoa(conditionsSummary, code),
-      criteria: student.criteria.map((c) => anDanhHoa(c.label, code)),
+      abilitiesTeacherNote: student.profile.abilitiesTeacherNote,
+      abilitiesStudentSelf: student.profile.abilitiesStudentSelf,
+      hollandSummary: student.profile.hollandSummaryText,
+      conditionsSummary,
+      criteria: student.criteria.map((c) => c.label),
       consideredOptions: student.consideredOptions.map((o) => ({
-        title: anDanhHoa(o.title, code),
+        title: o.title,
         status: o.status,
       })),
       recentJournals: student.journal.slice(0, 4).map((j) => ({
         date: j.date,
         activityType: j.activityType,
-        content: anDanhHoa(j.content, code),
+        content: j.content,
       })),
-      committedOption: student.commitment.chosenOption
-        ? anDanhHoa(student.commitment.chosenOption, code)
-        : "",
+      committedOption: student.commitment.chosenOption || "",
       behavioralSignals: describeBehavioralSignals(student.signals),
     }),
   });
@@ -221,7 +214,6 @@ export interface MeetingAgendaResponse {
 export async function requestTeacherMeetingAgenda(
   student: Student
 ): Promise<MeetingAgendaResponse> {
-  const code = student.anonymizedLabel || student.code;
   const conditionsSummary = [
     student.profile.conditions.commuteDistance,
     student.profile.conditions.familyFinance,
@@ -234,21 +226,19 @@ export async function requestTeacherMeetingAgenda(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      studentCode: `${student.code} (${code})`,
+      studentCode: student.fullName,
       currentStep: student.currentStep,
-      criteria: student.criteria.map((c) => anDanhHoa(c.label, code)),
+      criteria: student.criteria.map((c) => c.label),
       consideredOptions: student.consideredOptions.map((o) => ({
-        title: anDanhHoa(o.title, code),
+        title: o.title,
         status: o.status,
       })),
-      committedOption: student.commitment.chosenOption
-        ? anDanhHoa(student.commitment.chosenOption, code)
-        : "",
-      conditionsSummary: anDanhHoa(conditionsSummary, code),
+      committedOption: student.commitment.chosenOption || "",
+      conditionsSummary,
       recentJournals: student.journal.slice(0, 3).map((j) => ({
         date: j.date,
         activityType: j.activityType,
-        content: anDanhHoa(j.content, code),
+        content: j.content,
       })),
       behavioralSignals: describeBehavioralSignals(student.signals),
     }),
@@ -265,7 +255,7 @@ export async function requestTeacherMeetingAgenda(
 
 export interface ThematicCodingInputItem {
   journalId: string;
-  studentCode: string;
+  studentName: string;
   date: string;
   activityType: string;
   content: string;
@@ -273,7 +263,7 @@ export interface ThematicCodingInputItem {
 
 export interface ThematicCodingAIItem {
   journalId: string;
-  studentCode: string;
+  studentName: string;
   sourceLabel: string;
   codeLabel: string;
   suggestedTheme: string;
@@ -283,23 +273,37 @@ export interface ThematicCodingAIItem {
 export async function requestThematicCoding(
   entries: ThematicCodingInputItem[]
 ): Promise<ThematicCodingAIItem[]> {
-  const sanitized = entries.map((e) => ({
-    ...e,
-    content: anDanhHoa(e.content, e.studentCode),
-  }));
-
   const res = await fetch("/api/ai/teacher/thematic-coding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ entries: sanitized }),
+    body: JSON.stringify({
+      entries: entries.map((e) => ({
+        journalId: e.journalId,
+        studentCode: e.studentName,
+        date: e.date,
+        activityType: e.activityType,
+        content: e.content,
+      })),
+    }),
   });
 
   const data = (await res.json().catch(() => ({}))) as {
-    items?: ThematicCodingAIItem[];
+    items?: Array<Omit<ThematicCodingAIItem, "studentName"> & {
+      studentCode?: string;
+    }>;
     error?: string;
   };
   if (!res.ok) {
     throw new Error(data.error || "Không phân tích mã hóa chủ đề được lúc này.");
   }
-  return Array.isArray(data.items) ? data.items : [];
+  return Array.isArray(data.items)
+    ? data.items.map((item) => ({
+        journalId: item.journalId,
+        studentName: item.studentCode ?? "",
+        sourceLabel: item.sourceLabel,
+        codeLabel: item.codeLabel,
+        suggestedTheme: item.suggestedTheme,
+        evidenceQuote: item.evidenceQuote,
+      }))
+    : [];
 }

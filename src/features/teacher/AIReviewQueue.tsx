@@ -229,7 +229,7 @@ export const AIReviewQueue: React.FC<AIReviewQueueProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex flex-wrap items-center gap-2 text-slate-600 dark:text-slate-300">
                       <span className="font-bold text-sm text-[#1D242B] dark:text-white">
-                        {m.studentCode}
+                        {m.studentName}
                       </span>
                       <span aria-hidden="true">·</span>
                       <span className="tabular-nums">{m.createdAt}</span>
@@ -270,7 +270,7 @@ export const AIReviewQueue: React.FC<AIReviewQueueProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                     <div className="p-3.5 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200/80 dark:border-slate-800 space-y-1">
                       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        Học sinh vừa viết (đã ẩn danh)
+                        Học sinh vừa viết
                       </p>
                       <p className="leading-relaxed">{m.studentText}</p>
                     </div>

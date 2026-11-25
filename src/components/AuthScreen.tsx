@@ -3,7 +3,6 @@ import {
   AlertCircle,
   ArrowRight,
   BookOpen,
-  Building2,
   CheckCircle2,
   Compass,
   Eye,
@@ -42,13 +41,10 @@ import {
   type AuthField,
 } from "../services/authValidation";
 import {
-  DEMO_PARENT_PIN,
   MAX_CHILDREN_PER_PARENT,
-  SCHOOL_CLASSES,
-  schoolClassLabel,
   type SchoolRoster,
 } from "../data/schoolClasses";
-import type { AuthSession, Role, Student } from "../types";
+import type { AuthSession, Role } from "../types";
 
 type AuthMode = "login" | "register";
 
@@ -56,9 +52,7 @@ interface AuthScreenProps {
   darkMode: boolean;
   onToggleDarkMode: () => void;
   onAuthenticated: (session: AuthSession, savedOffline: boolean) => void;
-  onQuickDemo: () => void;
   onOpenProjectIntro: () => void;
-  students: Student[];
   roster: SchoolRoster | null;
 }
 
@@ -66,7 +60,6 @@ const ROLE_ICONS: Record<Role, React.FC<{ className?: string }>> = {
   student: GraduationCap,
   teacher: UserCheck,
   parent: Users,
-  school_admin: Building2,
 };
 
 const ROLE_ACTIVE_STYLES: Record<Role, string> = {
@@ -76,8 +69,6 @@ const ROLE_ACTIVE_STYLES: Record<Role, string> = {
     "border-[#223A1E] bg-[#EAF2D7]/80 dark:bg-[#EAF2D7]/15 dark:border-[#EAF2D7]",
   parent:
     "border-[#4A1A2C] bg-[#EFCFE3]/60 dark:bg-[#EFCFE3]/15 dark:border-[#EFCFE3]",
-  school_admin:
-    "border-[#7A5C1E] bg-[#F3E7C9]/70 dark:bg-[#F3E7C9]/10 dark:border-[#F3E7C9]",
 };
 
 const INPUT_CLASS =
@@ -87,9 +78,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   darkMode,
   onToggleDarkMode,
   onAuthenticated,
-  onQuickDemo,
   onOpenProjectIntro,
-  students,
   roster,
 }) => {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -108,15 +97,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [studentClass, setStudentClass] = useState(SCHOOL_CLASSES[0].id);
-  const [childClass, setChildClass] = useState(SCHOOL_CLASSES[0].id);
   const [childStudentId, setChildStudentId] = useState("");
   const [childPin, setChildPin] = useState("");
 
-  const effectiveRoster = roster ?? buildLocalRoster(students);
-  const childClassOptions = effectiveRoster.classes;
-  const childCandidates =
-    childClassOptions.find((item) => item.id === childClass)?.students ?? [];
+  const effectiveRoster = roster ?? buildLocalRoster();
+  const childCandidates = effectiveRoster.classes.flatMap(
+    (item) => item.students
+  );
 
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<AuthField, string>>
@@ -191,7 +178,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     if (fullNameError) nextErrors.fullName = fullNameError;
     if (role === "parent") {
       if (!childStudentId) {
-        nextErrors.childStudentId = "Vui lòng chọn họ tên con trong lớp đã chọn.";
+        nextErrors.childStudentId =
+          "Vui lòng chọn họ tên con trong danh sách học sinh đã đăng ký.";
       }
       const childPinError = formatPinError(childPin, "mã PIN của con");
       if (childPinError) nextErrors.childPin = childPinError;
@@ -222,8 +210,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         username: registerUsername,
         password: registerPassword,
         confirmPassword,
-        className: role === "student" ? studentClass : undefined,
-        childClassName: role === "parent" ? childClass : undefined,
         childStudentId: role === "parent" ? childStudentId : undefined,
         childPin: role === "parent" ? childPin : undefined,
       });
@@ -303,8 +289,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             <li className="flex items-start gap-2.5">
               <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-[#133C42] dark:text-[#B3DEE2]" />
               <span>
-                Không chấm điểm, không xếp hạng. Hồ sơ học sinh luôn được ẩn
-                danh.
+                Không chấm điểm, không xếp hạng. Dữ liệu của em chỉ được chia sẻ
+                theo cách em chủ động bật.
               </span>
             </li>
             <li className="flex items-start gap-2.5">
@@ -571,9 +557,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                           aria-pressed={active}
                           onClick={() => {
                             setRole(option);
-                            clearError("className");
                             clearError("parentPin");
-                            clearError("childClassName");
                             clearError("childStudentId");
                             clearError("childPin");
                           }}
@@ -600,37 +584,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </fieldset>
 
                 {role === "student" && (
-                  <div className="rounded-2xl border border-[#B3DEE2] dark:border-[#133C42] bg-[#B3DEE2]/20 dark:bg-[#B3DEE2]/5 p-4 space-y-3">
-                    <div>
-                      <label
-                        htmlFor="register-class"
-                        className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
-                      >
-                        Lớp của em
-                      </label>
-                      <select
-                        id="register-class"
-                        value={studentClass}
-                        onChange={(e) => {
-                          setStudentClass(e.target.value);
-                          clearError("className");
-                        }}
-                        className={`${INPUT_CLASS} px-3.5`}
-                      >
-                        {SCHOOL_CLASSES.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                      {renderFieldError("className")}
-                    </div>
+                  <div className="rounded-2xl border border-[#B3DEE2] dark:border-[#133C42] bg-[#B3DEE2]/20 dark:bg-[#B3DEE2]/5 p-4">
                     <p className="flex items-start gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                       <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#133C42] dark:text-[#B3DEE2]" />
                       <span>
-                        Hệ thống tự tạo mã PIN 4 số để kết nối với ba mẹ sau khi
-                        em đăng ký. Em xem và đổi mã bất cứ lúc nào trong hồ sơ
-                        của mình.
+                        Em đăng ký tài khoản học sinh Lớp 9 của riêng mình. Hệ
+                        thống tự tạo mã PIN 4 số để kết nối với ba mẹ sau khi em
+                        đăng ký; em xem và đổi mã bất cứ lúc nào trong hồ sơ của
+                        mình.
                       </span>
                     </p>
                   </div>
@@ -642,67 +603,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       Liên kết với con
                     </legend>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label
-                          htmlFor="register-child-class"
-                          className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
-                        >
-                          Lớp của con
-                        </label>
-                        <select
-                          id="register-child-class"
-                          value={childClass}
-                          onChange={(e) => {
-                            setChildClass(e.target.value);
-                            setChildStudentId("");
-                            clearError("childClassName");
-                            clearError("childStudentId");
-                          }}
-                          className={`${INPUT_CLASS} px-3.5`}
-                        >
-                          {childClassOptions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        {renderFieldError("childClassName")}
-                      </div>
-
-                      <div>
-                        <label
-                          htmlFor="register-child"
-                          className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
-                        >
-                          Họ tên con
-                        </label>
-                        <select
-                          id="register-child"
-                          value={childStudentId}
-                          onChange={(e) => {
-                            setChildStudentId(e.target.value);
-                            clearError("childStudentId");
-                          }}
-                          aria-invalid={Boolean(fieldErrors.childStudentId)}
-                          className={`${INPUT_CLASS} px-3.5 ${
-                            fieldErrors.childStudentId
-                              ? "border-rose-400 dark:border-rose-500"
-                              : ""
-                          }`}
-                        >
-                          <option value="">— Chọn họ tên con —</option>
-                          {childCandidates.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.displayName}
-                              {item.source === "account"
-                                ? " (Tài khoản mới)"
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
-                        {renderFieldError("childStudentId")}
-                      </div>
+                    <div>
+                      <label
+                        htmlFor="register-child"
+                        className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                      >
+                        Họ tên con
+                      </label>
+                      <select
+                        id="register-child"
+                        value={childStudentId}
+                        onChange={(e) => {
+                          setChildStudentId(e.target.value);
+                          clearError("childStudentId");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.childStudentId)}
+                        className={`${INPUT_CLASS} px-3.5 ${
+                          fieldErrors.childStudentId
+                            ? "border-rose-400 dark:border-rose-500"
+                            : ""
+                        }`}
+                      >
+                        <option value="">— Chọn họ tên con —</option>
+                        {childCandidates.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.fullName}
+                          </option>
+                        ))}
+                      </select>
+                      {renderFieldError("childStudentId")}
                     </div>
 
                     <div>
@@ -746,8 +675,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         mã sẽ bị từ chối. Mỗi tài khoản phụ huynh có thể liên
                         kết tối đa {MAX_CHILDREN_PER_PARENT} con và chuyển đổi
                         nhanh bằng mục &ldquo;Chọn con&rdquo; sau khi đăng nhập.
-                        {schoolClassLabel(childClass)} hiện có{" "}
-                        {childCandidates.length} học sinh để chọn.
+                        Hiện có {childCandidates.length} học sinh Lớp 9 đã đăng
+                        ký để chọn.
                       </span>
                     </p>
                   </fieldset>
@@ -906,7 +835,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </form>
             )}
 
-            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <Map className="w-4 h-4 shrink-0" />
                 <span>
@@ -914,28 +843,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   dụng tiếp tục dùng bản lưu trên thiết bị.
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={onQuickDemo}
-                className="w-full min-h-[52px] rounded-xl border border-[#133C42]/25 dark:border-[#B3DEE2]/40 bg-[#B3DEE2]/25 dark:bg-[#B3DEE2]/10 hover:bg-[#B3DEE2]/40 dark:hover:bg-[#B3DEE2]/20 px-4 py-3 text-left transition-colors cursor-pointer"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-[#133C42] dark:text-[#B3DEE2]">
-                  <Sparkles className="w-4 h-4 shrink-0" />
-                  Trải nghiệm nhanh với dữ liệu mẫu (45 học sinh)
-                </span>
-                <span className="mt-0.5 block text-xs text-slate-600 dark:text-slate-300">
-                  Không cần tài khoản: mở ngay cả 4 không gian Học sinh – Phụ
-                  huynh – Giáo viên – Quản lý nhà trường với dữ liệu mẫu.
-                </span>
-                <span className="mt-2 flex items-start gap-1.5 text-xs text-[#9D2950] dark:text-[#EA9AB2]">
-                  <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    Học sinh mẫu có mã PIN phụ huynh mặc định{" "}
-                    <strong>{DEMO_PARENT_PIN}</strong> — dùng thử liên kết con ở
-                    vai Phụ huynh ngay trên màn hình trải nghiệm.
-                  </span>
-                </span>
-              </button>
             </div>
           </div>
         </section>
@@ -943,8 +850,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       <footer className="border-t border-slate-200/70 dark:border-slate-800 py-4">
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 px-4">
-          La Bàn Lựa Chọn · Dữ liệu học sinh được ẩn danh · Không chấm điểm,
-          không xếp hạng
+          La Bàn Lựa Chọn · Không chấm điểm, không xếp hạng
         </p>
       </footer>
     </div>

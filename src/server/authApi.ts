@@ -9,15 +9,12 @@ import {
   validateRegisterInput,
 } from "../services/authValidation.ts";
 import {
-  DEMO_PARENT_PIN,
+  DEFAULT_CLASS_ID,
   MAX_CHILDREN_PER_PARENT,
   SCHOOL_CLASSES,
-  isValidClassId,
   type RosterClass,
   type SchoolRoster,
-  type SchoolStats,
 } from "../data/schoolClasses.ts";
-import { createInitialAppState } from "../data/mockData.ts";
 import type {
   AuthUser,
   LinkedChild,
@@ -30,8 +27,6 @@ const ACCOUNTS_FILE = path.join(DATA_DIR, "auth-accounts.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "auth-sessions.json");
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_PATTERN = /^\d{4}$/;
-
-const demoStudents = createInitialAppState().students;
 
 interface StoredAccount {
   id: string;
@@ -184,9 +179,7 @@ function parseRegisterBody(req: Request): RegisterAccountInput {
     username: str("username"),
     password: str("password"),
     confirmPassword: str("confirmPassword"),
-    className: str("className") || undefined,
     parentPin: str("parentPin") || undefined,
-    childClassName: str("childClassName") || undefined,
     childStudentId: str("childStudentId") || undefined,
     childPin: str("childPin") || undefined,
   };
@@ -199,40 +192,22 @@ interface ResolvedChild {
 }
 
 /**
- * Tìm học sinh theo lớp + mã hồ sơ. Học sinh mẫu dùng id "hs-xx",
- * học sinh có tài khoản dùng "acc:<id tài khoản>".
+ * Tìm học sinh theo mã hồ sơ. Chỉ còn học sinh có tài khoản thật ("acc:<id>").
  */
 function resolveChild(
   accounts: StoredAccount[],
-  classId: string,
   studentId: string
 ): ResolvedChild | null {
-  if (!isValidClassId(classId) || !studentId) return null;
-
-  if (studentId.startsWith("acc:")) {
-    const accountId = studentId.slice("acc:".length);
-    const account = accounts.find(
-      (item) =>
-        item.id === accountId &&
-        item.role === "student" &&
-        item.className === classId
-    );
-    if (!account) return null;
-    return {
-      studentId,
-      className: classId,
-      displayName: account.fullName,
-    };
-  }
-
-  const demo = demoStudents.find(
-    (student) => student.id === studentId && student.className === classId
+  if (!studentId.startsWith("acc:")) return null;
+  const accountId = studentId.slice("acc:".length);
+  const account = accounts.find(
+    (item) => item.id === accountId && item.role === "student"
   );
-  if (!demo) return null;
+  if (!account) return null;
   return {
     studentId,
-    className: classId,
-    displayName: `${demo.code} (${demo.anonymizedLabel})`,
+    className: DEFAULT_CLASS_ID,
+    displayName: account.fullName,
   };
 }
 
@@ -242,14 +217,12 @@ function verifyChildPin(
   pin: string
 ): boolean {
   if (!PIN_PATTERN.test(pin)) return false;
-  if (child.studentId.startsWith("acc:")) {
-    const accountId = child.studentId.slice("acc:".length);
-    const account = accounts.find(
-      (item) => item.id === accountId && item.role === "student"
-    );
-    return Boolean(account?.parentPin) && account?.parentPin === pin;
-  }
-  return pin === DEMO_PARENT_PIN;
+  if (!child.studentId.startsWith("acc:")) return false;
+  const accountId = child.studentId.slice("acc:".length);
+  const account = accounts.find(
+    (item) => item.id === accountId && item.role === "student"
+  );
+  return Boolean(account?.parentPin) && account?.parentPin === pin;
 }
 
 function generateParentPin(): string {
@@ -260,27 +233,19 @@ function buildRoster(accounts: StoredAccount[]): SchoolRoster {
   const classes: RosterClass[] = SCHOOL_CLASSES.map((option) => ({
     id: option.id,
     label: option.label,
-    students: demoStudents
-      .filter((student) => student.className === option.id)
-      .map((student) => ({
-        id: student.id,
-        displayName: `${student.code} (${student.anonymizedLabel})`,
-        source: "demo" as const,
-      })),
+    students: [],
   }));
 
   for (const account of accounts) {
-    if (account.role !== "student" || !account.className) continue;
-    const target = classes.find((cls) => cls.id === account.className);
-    if (!target) continue;
-    target.students.push({
+    if (account.role !== "student") continue;
+    classes[0]?.students.push({
       id: `acc:${account.id}`,
-      displayName: account.fullName,
+      fullName: account.fullName,
       source: "account",
     });
   }
 
-  return { classes, demoPin: DEMO_PARENT_PIN };
+  return { classes };
 }
 
 export function registerAuthRoutes(app: Express): void {
@@ -314,20 +279,16 @@ export function registerAuthRoutes(app: Express): void {
     let linkedChildren: LinkedChild[] | undefined;
 
     if (input.role === "student") {
-      className = input.className;
+      className = DEFAULT_CLASS_ID;
       parentPin = generateParentPin();
     }
 
     if (input.role === "parent") {
-      const child = resolveChild(
-        accounts,
-        input.childClassName ?? "",
-        input.childStudentId ?? ""
-      );
+      const child = resolveChild(accounts, input.childStudentId ?? "");
       if (!child) {
         res.status(400).json({
           error:
-            "Không tìm thấy học sinh này trong lớp đã chọn. Vui lòng kiểm tra lại.",
+            "Không tìm thấy học sinh này trong danh sách đã đăng ký. Vui lòng kiểm tra lại.",
           code: "CHILD_NOT_FOUND",
           field: "childStudentId",
         });
@@ -457,24 +418,15 @@ export function registerAuthRoutes(app: Express): void {
     }
 
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const classId = typeof body.classId === "string" ? body.classId : "";
     const studentId = typeof body.studentId === "string" ? body.studentId : "";
     const pin = typeof body.pin === "string" ? body.pin.trim() : "";
 
-    if (!isValidClassId(classId)) {
-      res.status(400).json({
-        error: "Vui lòng chọn lớp của con.",
-        code: "INVALID_INPUT",
-        field: "childClassName",
-      });
-      return;
-    }
     const accounts = await accountsStore.read();
-    const child = resolveChild(accounts, classId, studentId);
+    const child = resolveChild(accounts, studentId);
     if (!child) {
       res.status(400).json({
         error:
-          "Không tìm thấy học sinh này trong lớp đã chọn. Vui lòng kiểm tra lại.",
+          "Không tìm thấy học sinh này trong danh sách đã đăng ký. Vui lòng kiểm tra lại.",
         code: "CHILD_NOT_FOUND",
         field: "childStudentId",
       });
@@ -562,37 +514,10 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   /**
-   * Danh sách lớp + học sinh dùng cho chọn lớp và liên kết phụ huynh (không chứa mã PIN).
+   * Danh sách lớp + học sinh đã đăng ký dùng cho liên kết phụ huynh (không chứa mã PIN).
    */
   app.get("/api/school/roster", async (_req, res) => {
     const accounts = await accountsStore.read();
     res.json(buildRoster(accounts));
-  });
-
-  /**
-   * Thống kê tài khoản toàn trường cho vai trò Quản lý nhà trường.
-   */
-  app.get("/api/school/stats", async (_req, res) => {
-    const accounts = await accountsStore.read();
-    const stats: SchoolStats = {
-      teachers: 0,
-      students: 0,
-      parents: 0,
-      schoolAdmins: 0,
-      classCounts: {},
-    };
-    for (const account of accounts) {
-      if (account.role === "teacher") stats.teachers += 1;
-      if (account.role === "parent") stats.parents += 1;
-      if (account.role === "school_admin") stats.schoolAdmins += 1;
-      if (account.role === "student") {
-        stats.students += 1;
-        if (account.className) {
-          stats.classCounts[account.className] =
-            (stats.classCounts[account.className] ?? 0) + 1;
-        }
-      }
-    }
-    res.json(stats);
   });
 }

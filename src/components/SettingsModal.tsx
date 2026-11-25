@@ -156,7 +156,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setConfirmReset(false);
     setErrorMessage(null);
     setStatusMessage(
-      "Đã khôi phục toàn bộ dữ liệu mẫu lớp 9A1 (45 học sinh ẩn danh)."
+      "Đã khôi phục dữ liệu mặc định (danh sách học sinh được tạo từ tài khoản đăng ký)."
     );
   };
 
@@ -322,12 +322,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="min-h-[40px] px-3.5 py-2 rounded-xl border border-[#EA9AB2] bg-[#EFCFE3]/40 hover:bg-[#EFCFE3]/70 text-[#4A1A2C] dark:text-[#EFCFE3] text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Khôi phục dữ liệu mẫu</span>
+                <span>Khôi phục dữ liệu ban đầu</span>
               </button>
             ) : (
               <div className="w-full p-3 rounded-xl bg-[#EFCFE3]/45 dark:bg-[#4A1A2C]/40 border border-[#E27396] flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-[#4A1A2C] dark:text-[#EFCFE3]">
-                  Xác nhận đưa toàn bộ dữ liệu về bản mẫu 45 học sinh ban đầu?
+                  Xác nhận xóa toàn bộ dữ liệu hiện tại và đưa ứng dụng về trạng thái ban đầu?
                 </span>
                 <div className="flex items-center gap-2">
                   <button

@@ -27,12 +27,11 @@ interface ContentAdminProps {
 }
 
 const PATHWAY_CATEGORIES: { value: Pathway["category"]; label: string }[] = [
-  { value: "THPT", label: "THPT" },
-  { value: "GDTX", label: "GDTX" },
+  { value: "THPT_CONG_LAP", label: "THPT công lập" },
+  { value: "THPT_TU_THUC", label: "THPT tư thục" },
+  { value: "GDTX", label: "Giáo dục thường xuyên" },
   { value: "TRUNG_CAP", label: "Trung cấp nghề" },
   { value: "SO_CAP", label: "Sơ cấp nghề" },
-  { value: "LIEN_THONG_CD_DH", label: "Liên thông CĐ – ĐH" },
-  { value: "DI_LAM", label: "Đi làm tích lũy tay nghề" },
 ];
 
 export const ContentAdmin: React.FC<ContentAdminProps> = ({
@@ -85,11 +84,11 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
       entryRequirements: "Nhà trường cập nhật",
       learningContent: "Nhà trường cập nhật",
       careerOpportunities: "Nhà trường cập nhật",
-      articulationPath: "Tiếp tục học tập suốt đời / Liên thông phù hợp",
+      articulationPath: "Tiếp tục học tập suốt đời / Học tiếp trình độ cao hơn phù hợp",
       realSchoolNames: "",
+      realSchoolAddresses: "",
       tuitionEstimate: "",
       admissionCutoff: "",
-      employmentData: "",
       realStories: [],
     });
     setSelectedPathwayId(createdId);
@@ -477,7 +476,7 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold mb-1">
-                  Đường học liên thông
+                  Cơ hội học tiếp / chuyển tiếp trình độ cao hơn
                 </label>
                 <textarea
                   rows={2}
@@ -499,8 +498,8 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                 <label className="block text-xs font-semibold mb-1">
                   Tên trường thật tại địa phương
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={4}
                   value={selectedPathway.realSchoolNames}
                   onChange={(e) =>
                     onUpdatePathway({
@@ -508,8 +507,26 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                       realSchoolNames: e.target.value,
                     })
                   }
-                  placeholder="Để trống nếu muốn hiện 'Nhà trường cập nhật'"
-                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2 text-sm"
+                  placeholder="Mỗi trường một dòng. Để trống nếu muốn hiện 'Nhà trường cập nhật'"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  Địa chỉ trường sau sắp xếp đơn vị hành chính
+                </label>
+                <textarea
+                  rows={4}
+                  value={selectedPathway.realSchoolAddresses}
+                  onChange={(e) =>
+                    onUpdatePathway({
+                      ...selectedPathway,
+                      realSchoolAddresses: e.target.value,
+                    })
+                  }
+                  placeholder="Ghi chú địa chỉ / lưu ý kiểm tra lại với Sở GD&ĐT"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 text-sm"
                 />
               </div>
 
@@ -517,8 +534,8 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                 <label className="block text-xs font-semibold mb-1">
                   Học phí / chi phí ước tính chính thức
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={4}
                   value={selectedPathway.tuitionEstimate}
                   onChange={(e) =>
                     onUpdatePathway({
@@ -527,7 +544,7 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                     })
                   }
                   placeholder="Để trống nếu muốn hiện 'Nhà trường cập nhật'"
-                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2 text-sm"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 text-sm"
                 />
               </div>
 
@@ -535,8 +552,8 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                 <label className="block text-xs font-semibold mb-1">
                   Điểm chuẩn / phương thức xét tuyển của trường
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={4}
                   value={selectedPathway.admissionCutoff}
                   onChange={(e) =>
                     onUpdatePathway({
@@ -545,25 +562,7 @@ export const ContentAdmin: React.FC<ContentAdminProps> = ({
                     })
                   }
                   placeholder="Để trống nếu muốn hiện 'Nhà trường cập nhật'"
-                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">
-                  Thông tin việc làm thực tế tại địa phương
-                </label>
-                <input
-                  type="text"
-                  value={selectedPathway.employmentData}
-                  onChange={(e) =>
-                    onUpdatePathway({
-                      ...selectedPathway,
-                      employmentData: e.target.value,
-                    })
-                  }
-                  placeholder="Để trống nếu muốn hiện 'Nhà trường cập nhật'"
-                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2 text-sm"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 text-sm"
                 />
               </div>
             </div>

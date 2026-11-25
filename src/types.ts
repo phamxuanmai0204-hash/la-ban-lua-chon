@@ -1,4 +1,4 @@
-export type Role = "student" | "teacher" | "parent" | "school_admin";
+export type Role = "student" | "teacher" | "parent";
 
 export type JourneyStep = "THU" | "LỌC" | "THỬ" | "CHỐT" | "CAM KẾT";
 
@@ -61,8 +61,7 @@ export interface ActionTask {
 }
 
 export interface Commitment {
-  studentDisplayCode: string;
-  studentNamePlaceholder: string;
+  studentFullName: string;
   className: string;
   chosenOption: string;
   reasonInOwnWords: string;
@@ -124,14 +123,40 @@ export interface Assessment {
   studentSelf: AssessmentLevelMap;
 }
 
+export interface StudentSummary {
+  generatedAt: string;
+  sentToTeacherAt: string;
+  sentToParentAt: string | null;
+  identity: {
+    fullName: string;
+    className: string;
+    parentContact: string;
+    teacherContact: string;
+    completedAt: string;
+  };
+  selfProfile: {
+    strengths: string;
+    teacherNote: string;
+    holland: string;
+    conditions: string;
+    fluctuation: string;
+  };
+  steps: {
+    thu: string;
+    loc: string;
+    thuTry: string;
+    chot: string;
+    camKet: string;
+  };
+  aiInteraction: string;
+  readiness: string;
+  sendStatus: string;
+}
+
 export interface Student {
   id: string;
-  code: string; // e.g., "HS A", "HS B", "HS 05"
-  anonymizedLabel: string; // e.g., "HS 01"
+  fullName: string;
   className: string;
-  isCaseStudy?: boolean;
-  caseStudySummary?: string;
-  isFocusGroup: boolean;
   currentStep: JourneyStep;
   completedSteps?: JourneyStep[];
   shareWithParent: boolean;
@@ -147,6 +172,8 @@ export interface Student {
   commitment: Commitment;
   signals: BehaviorSignal;
   assessment: Assessment;
+  /** Hồ sơ tổng hợp 6 phần do AI biên soạn khi hoàn thành 5 bước */
+  summary?: StudentSummary;
 }
 
 export interface RealStoryLink {
@@ -176,17 +203,22 @@ export interface CareerScenario {
   startNodeId: string;
   nodes: CareerScenarioNode[];
   reflectionPrompt: string;
+  /** "shortAnswer" = học sinh tự viết câu trả lời thay vì chọn trắc nghiệm */
+  responseMode?: "choices" | "shortAnswer";
+  shortAnswerPrompt?: string;
+  shortAnswerSuggestions?: string[];
 }
+
+export type PathwayCategory =
+  | "THPT_CONG_LAP"
+  | "THPT_TU_THUC"
+  | "GDTX"
+  | "TRUNG_CAP"
+  | "SO_CAP";
 
 export interface Pathway {
   id: string;
-  category:
-    | "THPT"
-    | "GDTX"
-    | "TRUNG_CAP"
-    | "SO_CAP"
-    | "LIEN_THONG_CD_DH"
-    | "DI_LAM";
+  category: PathwayCategory;
   title: string;
   shortSubtitle: string;
   entryRequirements: string;
@@ -195,9 +227,10 @@ export interface Pathway {
   articulationPath: string;
   // Never fabricated: blank by default -> displays "Nhà trường cập nhật"
   realSchoolNames: string;
+  realSchoolAddresses: string;
   tuitionEstimate: string;
   admissionCutoff: string;
-  employmentData: string;
+  imageUrl?: string;
   realStories: RealStoryLink[];
   scenario?: CareerScenario;
 }
@@ -227,7 +260,7 @@ export type AIQuestionType =
 export interface AIMessage {
   id: string;
   studentId: string;
-  studentCode: string;
+  studentName: string;
   createdAt: string;
   triggerReason: string;
   studentText: string;
@@ -258,7 +291,7 @@ export interface AIModerationLog {
   id: string;
   messageId: string;
   studentId: string;
-  studentCode: string;
+  studentName: string;
   action: AIModerationAction;
   actor: string;
   timestamp: string;
@@ -277,7 +310,7 @@ export interface ThematicCodeItem {
   evidenceQuote: string;
   sourceLabel: string;
   journalId: string;
-  studentCode: string;
+  studentName: string;
   status: ThematicCodeStatus;
   aiGenerated: boolean;
 }
@@ -285,7 +318,7 @@ export interface ThematicCodeItem {
 export interface Meeting {
   id: string;
   studentId: string;
-  studentCode: string;
+  studentName: string;
   dateTime: string;
   locationOrChannel: string;
   parentInvited: boolean;
@@ -310,7 +343,7 @@ export interface AppSettings {
 }
 
 export interface LinkedChild {
-  /** id học sinh mẫu (ví dụ "hs-02") hoặc "acc:<id tài khoản học sinh>" */
+  /** Mã hồ sơ học sinh dạng "acc:<id tài khoản học sinh>" */
   studentId: string;
   className: string;
   displayName: string;
@@ -342,12 +375,11 @@ export interface RegisterAccountInput {
   username: string;
   password: string;
   confirmPassword: string;
-  /** Học sinh: lớp đang học */
+  /** Học sinh: lớp đang học (luôn là Lớp 9) */
   className?: string;
   /** Học sinh: mã PIN 4 số chia sẻ cho phụ huynh */
   parentPin?: string;
   /** Phụ huynh: liên kết con khi đăng ký */
-  childClassName?: string;
   childStudentId?: string;
   childPin?: string;
 }

@@ -101,8 +101,8 @@ function buildCaseStudyNarrative(
     "đang tiếp tục cân nhắc";
   const stuMeetings = meetings.filter((m) => m.studentId === stu.id);
 
-  const p1 = `[Trường hợp ${stu.code} – ${stu.anonymizedLabel}, Lớp ${stu.className}${stu.isFocusGroup ? ", Nhóm trọng tâm" : ""}]`;
-  const p2 = `1. Bối cảnh ban đầu: ${stu.caseStudySummary || stu.profile.abilitiesTeacherNote} Khi tự soi chiếu, em chia sẻ: "${stu.profile.abilitiesStudentSelf}".`;
+  const p1 = `[Trường hợp ${stu.fullName}, Lớp ${stu.className}]`;
+  const p2 = `1. Bối cảnh ban đầu: ${stu.profile.abilitiesTeacherNote} Khi tự soi chiếu, em chia sẻ: "${stu.profile.abilitiesStudentSelf}".`;
   const p3 = `2. Quá trình đặt tiêu chí và thu hẹp lựa chọn: Em tự xác định ${stu.criteria.length} tiêu chí cá nhân (${stu.criteria.map((c) => c.label).join(", ") || "chưa bổ sung"}). ${
     pausedOptions.length > 0
       ? `Sau khi đối chiếu bảng tiêu chí, em đã chủ động tạm gác phương án: ${pausedOptions.join(", ")}.`
@@ -129,9 +129,8 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
   const [subTab, setSubTab] = useState<"before_after" | "case_study">(
     "before_after"
   );
-  const [chartCohort, setChartCohort] = useState<"focus" | "all">("focus");
   const [selectedCaseId, setSelectedCaseId] = useState<string>(
-    appState.students[0]?.id || "hs-01"
+    appState.students[0]?.id || ""
   );
   const [draftsByStudent, setDraftsByStudent] = useState<
     Record<string, string>
@@ -140,15 +139,7 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
   const [exportingZip, setExportingZip] = useState(false);
   const [zipMessage, setZipMessage] = useState<string | null>(null);
 
-  const focusStudents = useMemo(
-    () => appState.students.filter((s) => s.isFocusGroup),
-    [appState.students]
-  );
-
-  const chartStudents =
-    chartCohort === "focus" && focusStudents.length > 0
-      ? focusStudents
-      : appState.students;
+  const chartStudents = appState.students;
 
   const selectedCaseStudent =
     appState.students.find((s) => s.id === selectedCaseId) ||
@@ -186,7 +177,7 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
     try {
       await exportResearchZipPackage(appState);
       setZipMessage(
-        "Đã xuất gói ZIP gồm 3 tệp CSV ẩn danh và 1 bản PDF tóm tắt tiếng Việt."
+        "Đã xuất gói ZIP gồm 3 tệp CSV và 1 bản PDF tóm tắt tiếng Việt."
       );
     } catch (err) {
       setZipMessage(
@@ -211,7 +202,7 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
               Chế độ Nghiên cứu · Báo cáo định tính Trước – Sau
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-              Toàn bộ bảng đối chiếu, biểu đồ và gói dữ liệu xuất hoàn toàn ẩn danh theo thang 4 mức mô tả bằng lời (không dùng thang số, không xếp hạng).
+              Toàn bộ bảng đối chiếu, biểu đồ và gói dữ liệu xuất theo thang 4 mức mô tả bằng lời (không dùng thang số, không xếp hạng).
             </p>
           </div>
 
@@ -303,28 +294,9 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
               </div>
 
               <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-[#0F171E]">
-                <button
-                  type="button"
-                  onClick={() => setChartCohort("focus")}
-                  className={`min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
-                    chartCohort === "focus"
-                      ? "bg-white dark:bg-[#17222C] text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-600 dark:text-slate-400"
-                  }`}
-                >
-                  Nhóm trọng tâm ({focusStudents.length} HS)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartCohort("all")}
-                  className={`min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
-                    chartCohort === "all"
-                      ? "bg-white dark:bg-[#17222C] text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-600 dark:text-slate-400"
-                  }`}
-                >
+                <span className="min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-[#17222C] text-slate-900 dark:text-white shadow-sm inline-flex items-center">
                   Cả lớp ({appState.students.length} HS)
-                </button>
+                </span>
               </div>
             </div>
 
@@ -399,12 +371,8 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
             </div>
           </section>
 
-          {/* Verbal comparison tables: Nhóm trọng tâm + Cả lớp */}
+          {/* Verbal comparison table */}
           {[
-            {
-              title: `Bảng so sánh bằng lời · Nhóm trọng tâm (${focusStudents.length} HS)`,
-              list: focusStudents,
-            },
             {
               title: `Bảng so sánh bằng lời · Cả lớp (${appState.students.length} HS)`,
               list: appState.students,
@@ -474,7 +442,7 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
                 Tổng hợp đoạn mô tả &ldquo;Trường hợp điển hình&rdquo;
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-                Chọn một học sinh ẩn danh để hệ thống ghép nối dòng thời gian, nhật ký, họp ba bên và rubric thành đoạn kể mạch lạc cho báo cáo nghiên cứu.
+                Chọn một học sinh để hệ thống ghép nối dòng thời gian, nhật ký, họp ba bên và rubric thành đoạn kể mạch lạc cho báo cáo nghiên cứu.
               </p>
             </div>
 
@@ -486,8 +454,7 @@ export const ResearchMode: React.FC<ResearchModeProps> = ({
             >
               {appState.students.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.code} ({s.anonymizedLabel})
-                  {s.isFocusGroup ? " · Trọng tâm" : ""} · {s.currentStep}
+                  {s.fullName} · {s.currentStep}
                 </option>
               ))}
             </select>

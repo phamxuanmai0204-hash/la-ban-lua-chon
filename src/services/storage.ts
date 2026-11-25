@@ -9,7 +9,8 @@ import {
   onSnapshot,
   type Firestore,
 } from "firebase/firestore";
-import { createInitialAppState } from "../data/mockData";
+import { createInitialAppState, createStudentProfile } from "../data/mockData";
+import { DEFAULT_CLASS_ID } from "../data/schoolClasses";
 import type {
   AIMessage,
   AIMessageStatus,
@@ -19,7 +20,7 @@ import type {
   Student,
 } from "../types";
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 6;
 export const MAIN_STATE_KEY = "la_ban_app_state";
 const LEGACY_V1_STORAGE_KEY = "la_ban_lua_chon_state_v1";
 const FIREBASE_CONFIG_STORAGE_KEY = "la_ban_firebase_config_v2";
@@ -90,36 +91,18 @@ function asStringArray(value: unknown): string[] {
 }
 
 /**
- * Backfills every field the UI reads so old or partial records cannot crash a screen.
+ * Bản ghi cũ (trước v5) chứa 45 học sinh mẫu "HS A/HS 01..." — nay xoá hoàn toàn.
+ * Chỉ giữ hồ sơ gắn với tài khoản học sinh thật ("acc:<id tài khoản>").
  */
-function findBaselineStudent(
-  item: unknown,
-  baselineStudents: Student[]
-): Student | undefined {
-  const s = asRecord(item);
-  const keys = [asString(s.id), asString(s.code), asString(s.anonymizedLabel)]
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return baselineStudents.find((student) =>
-    [student.id, student.code, student.anonymizedLabel].some((key) =>
-      keys.includes(key.toLowerCase())
-    )
-  );
+function isAccountStudentId(value: string): boolean {
+  return value.startsWith("acc:");
 }
 
-function migrateStudent(
-  item: unknown,
-  baselineStudents: Student[],
-  normalizeDemoRecord = false
-): Student {
+function migrateStudent(item: unknown): Student {
   const s = asRecord(item);
-  const matchedBase = findBaselineStudent(item, baselineStudents);
-  const base = matchedBase ?? baselineStudents[0];
-  const isDemoRecord = Boolean(matchedBase);
-  const className =
-    normalizeDemoRecord && isDemoRecord
-      ? base.className
-      : asString(s.className, base.className);
+  const id = asString(s.id);
+  const fullName = asString(s.fullName, "Học sinh");
+  const base = createStudentProfile(id, fullName, DEFAULT_CLASS_ID);
 
   const profile = asRecord(s.profile);
   const conditions = asRecord(profile.conditions ?? s.conditions);
@@ -157,10 +140,9 @@ function migrateStudent(
   return {
     ...base,
     ...(s as unknown as Student),
-    id: normalizeDemoRecord && isDemoRecord ? base.id : asString(s.id, base.id),
-    code: asString(s.code, base.code),
-    anonymizedLabel: asString(s.anonymizedLabel, base.anonymizedLabel),
-    className,
+    id,
+    fullName,
+    className: DEFAULT_CLASS_ID,
     currentStep,
     completedSteps: Array.isArray(s.completedSteps)
       ? (s.completedSteps as Student["completedSteps"])
@@ -173,9 +155,7 @@ function migrateStudent(
     privacyConsentAcceptedAt:
       typeof s.privacyConsentAcceptedAt === "string"
         ? s.privacyConsentAcceptedAt
-        : s.privacyConsentAccepted
-        ? "2026-11-05 08:30"
-        : undefined,
+        : base.privacyConsentAcceptedAt,
     dataDeletionRequestedAt:
       typeof s.dataDeletionRequestedAt === "string"
         ? s.dataDeletionRequestedAt
@@ -191,31 +171,16 @@ function migrateStudent(
         profile.abilitiesStudentSelf,
         asString(s.studentAbilityNote, base.profile.abilitiesStudentSelf)
       ),
-      hollandSelectedIds:
-        legacyHollandIds.length > 0
-          ? legacyHollandIds
-          : base.profile.hollandSelectedIds,
+      hollandSelectedIds: legacyHollandIds,
       hollandSummaryText: asString(
         profile.hollandSummaryText,
         base.profile.hollandSummaryText
       ),
       conditions: {
-        commuteDistance: asString(
-          conditions.commuteDistance,
-          base.profile.conditions.commuteDistance
-        ),
-        familyFinance: asString(
-          conditions.familyFinance,
-          base.profile.conditions.familyFinance
-        ),
-        earlyIndependence: asString(
-          conditions.earlyIndependence,
-          base.profile.conditions.earlyIndependence
-        ),
-        healthNote: asString(
-          conditions.healthNote,
-          base.profile.conditions.healthNote
-        ),
+        commuteDistance: asString(conditions.commuteDistance),
+        familyFinance: asString(conditions.familyFinance),
+        earlyIndependence: asString(conditions.earlyIndependence),
+        healthNote: asString(conditions.healthNote),
       },
     },
     criteria: Array.isArray(s.criteria)
@@ -234,13 +199,14 @@ function migrateStudent(
     commitment: {
       ...base.commitment,
       ...commitment,
-      className:
-        normalizeDemoRecord && isDemoRecord
-          ? base.className
-          : asString(commitment.className, base.commitment.className),
+      studentFullName: fullName,
+      className: DEFAULT_CLASS_ID,
       chosenOption: asString(
         commitment.chosenOption,
-        asString(commitment.chosenOptionLabel, base.commitment.chosenOption)
+        asString(
+          commitment.chosenOptionLabel,
+          base.commitment.chosenOption
+        )
       ),
       reasonInOwnWords: asString(
         commitment.reasonInOwnWords,
@@ -295,7 +261,8 @@ function migrateStudent(
 }
 
 /**
- * Migrates any v1 or partial state to v2 AppState without losing user-entered records.
+ * Migrates any legacy/partial state to the current AppState without the old
+ * demo roster. Hồ sơ không gắn tài khoản bị loại bỏ hoàn toàn.
  */
 export function migrateAppState(raw: unknown): AppState {
   const baseline = createInitialAppState();
@@ -308,37 +275,23 @@ export function migrateAppState(raw: unknown): AppState {
     typeof record.schemaVersion === "number" ? record.schemaVersion : 1;
 
   const rawStudents = Array.isArray(record.students) ? record.students : [];
-  if (rawStudents.length === 0) {
-    return baseline;
-  }
+  const migratedStudents: Student[] = rawStudents
+    .map((item) => asRecord(item))
+    .filter((item) => isAccountStudentId(asString(item.id)))
+    .map((item) => migrateStudent(item));
 
-  const normalizeDemo = version < 4;
-  const migratedStudents: Student[] = rawStudents.map((item) =>
-    migrateStudent(item, baseline.students, normalizeDemo)
-  );
-
-  const demoIdMap = new Map<string, string>();
-  if (normalizeDemo) {
-    for (const item of rawStudents) {
-      const oldId = asString((item as Record<string, unknown>).id).trim();
-      const base = findBaselineStudent(item, baseline.students);
-      if (oldId && base && oldId !== base.id) demoIdMap.set(oldId, base.id);
-    }
-  }
-  const remapStudentId = (value: unknown) => {
-    const id = asString(value);
-    return demoIdMap.get(id) ?? id;
-  };
+  const keptStudentIds = new Set(migratedStudents.map((s) => s.id));
+  const belongsToKeptStudent = (value: unknown) =>
+    keptStudentIds.has(asString(value));
 
   const rawMessages = Array.isArray(record.aiMessages) ? record.aiMessages : [];
-  const migratedMessages: AIMessage[] = rawMessages.map((msg) => {
-    const m = msg as Record<string, unknown>;
-    return {
+  const migratedMessages: AIMessage[] = rawMessages
+    .map((msg) => msg as Record<string, unknown>)
+    .filter((m) => belongsToKeptStudent(m.studentId))
+    .map((m) => ({
       ...(m as unknown as AIMessage),
-      studentId: remapStudentId(m.studentId),
       status: mapLegacyAIMessageStatus(String(m.status || "chờ duyệt")),
-    };
-  });
+    }));
 
   const rawExperiences = Array.isArray(record.experiences)
     ? record.experiences
@@ -346,15 +299,18 @@ export function migrateAppState(raw: unknown): AppState {
     ? record.tryActivities
     : baseline.experiences;
 
-  const migratedPathways = Array.isArray(record.pathways)
-    ? (record.pathways as AppState["pathways"]).map((p) => {
-        const baseMatch = baseline.pathways.find((bp) => bp.id === p.id);
-        return {
-          ...p,
-          scenario: p.scenario || baseMatch?.scenario,
-        };
-      })
-    : baseline.pathways;
+  const migratedPathways =
+    version < 6
+      ? baseline.pathways
+      : Array.isArray(record.pathways)
+      ? (record.pathways as AppState["pathways"]).map((p) => {
+          const baseMatch = baseline.pathways.find((bp) => bp.id === p.id);
+          return {
+            ...p,
+            scenario: p.scenario || baseMatch?.scenario,
+          };
+        })
+      : baseline.pathways;
 
   const rawSettings =
     record.settings && typeof record.settings === "object"
@@ -368,19 +324,17 @@ export function migrateAppState(raw: unknown): AppState {
     experiences: rawExperiences as AppState["experiences"],
     aiMessages: migratedMessages,
     aiModerationLogs: Array.isArray(record.aiModerationLogs)
-      ? (record.aiModerationLogs as AppState["aiModerationLogs"]).map((log) => ({
-          ...log,
-          studentId: remapStudentId(log.studentId),
-        }))
+      ? (record.aiModerationLogs as AppState["aiModerationLogs"]).filter((log) =>
+          belongsToKeptStudent(log.studentId)
+        )
       : baseline.aiModerationLogs,
     thematicCodes: Array.isArray(record.thematicCodes)
       ? (record.thematicCodes as AppState["thematicCodes"])
       : baseline.thematicCodes,
     meetings: Array.isArray(record.meetings)
-      ? (record.meetings as AppState["meetings"]).map((meeting) => ({
-          ...meeting,
-          studentId: remapStudentId(meeting.studentId),
-        }))
+      ? (record.meetings as AppState["meetings"]).filter((meeting) =>
+          belongsToKeptStudent(meeting.studentId)
+        )
       : baseline.meetings,
     settings: {
       ...baseline.settings,

@@ -44,8 +44,7 @@ function downloadCSV(filename: string, headers: string[], rows: unknown[][]): vo
 
 export function buildQualitativeAssessmentCSVData(students: Student[]): string {
   const headers = [
-    "Ma_hoc_sinh_an_danh",
-    "Nhom_trong_tam",
+    "Ho_ten_hoc_sinh",
     "Buoc_hien_tai",
     "Truoc_Hieu_ban_than",
     "Sau_Hieu_ban_than",
@@ -68,8 +67,7 @@ export function buildQualitativeAssessmentCSVData(students: Student[]): string {
         `${c.title}: ${s.assessment.after.criterionEvidence?.[c.key] || "Chưa ghi"}`
     ).join(" | ");
     return [
-      s.anonymizedLabel,
-      s.isFocusGroup ? "Có" : "Không",
+      s.fullName,
       s.currentStep,
       s.assessment.before.understandingSelf,
       s.assessment.after.understandingSelf,
@@ -101,14 +99,14 @@ export function exportQualitativeAssessmentCSV(students: Student[]): void {
 export function buildThematicCodesCSVData(items: ThematicCodeItem[]): string {
   const accepted = items.filter((item) => item.status === "accepted");
   const headers = [
-    "Ma_hoc_sinh_an_danh",
+    "Ho_ten_hoc_sinh",
     "Chu_de",
     "Ma_hoa",
     "Minh_chung",
     "Nguon",
   ];
   const rows = accepted.map((item) => [
-    item.studentCode,
+    item.studentName,
     item.theme,
     item.codeLabel,
     item.evidenceQuote,
@@ -130,7 +128,7 @@ export function exportThematicCodesCSV(items: ThematicCodeItem[]): void {
 
 export function buildAIModerationLogsCSVData(logs: AIModerationLog[]): string {
   const headers = [
-    "Ma_hoc_sinh_an_danh",
+    "Ho_ten_hoc_sinh",
     "Thoi_diem",
     "Hanh_dong",
     "Nguoi_thuc_hien",
@@ -140,7 +138,7 @@ export function buildAIModerationLogsCSVData(logs: AIModerationLog[]): string {
     "Li_do",
   ];
   const rows = logs.map((l) => [
-    l.studentCode,
+    l.studentName,
     l.timestamp,
     l.action,
     l.actor,
@@ -156,7 +154,7 @@ export function exportAIModerationLogsCSV(logs: AIModerationLog[]): void {
   downloadCSV(
     "la-ban-lich-su-kiem-duyet-ai.csv",
     [
-      "Ma_hoc_sinh_an_danh",
+      "Ho_ten_hoc_sinh",
       "Thoi_diem",
       "Hanh_dong",
       "Nguoi_thuc_hien",
@@ -166,7 +164,7 @@ export function exportAIModerationLogsCSV(logs: AIModerationLog[]): void {
       "Li_do",
     ],
     logs.map((l) => [
-      l.studentCode,
+      l.studentName,
       l.timestamp,
       l.action,
       l.actor,
@@ -239,7 +237,7 @@ export async function generateResearchSummaryPDFBytes(
   ctx.fillText("LA BÀN LỰA CHỌN – TÓM TẮT DỮ LIỆU NGHIÊN CỨU", 64, 72);
   ctx.font = '500 20px "Be Vietnam Pro", system-ui, sans-serif';
   ctx.fillText(
-    "Hỗ trợ nâng cao năng lực ra quyết định nghề nghiệp cho học sinh lớp 9 (Dữ liệu ẩn danh)",
+    "Hỗ trợ nâng cao năng lực ra quyết định nghề nghiệp cho học sinh lớp 9",
     64,
     114
   );
@@ -253,11 +251,7 @@ export async function generateResearchSummaryPDFBytes(
   let y = 215;
 
   // Section 1: Sample overview
-  const focusStudents = state.students.filter((s) => s.isFocusGroup);
   const committedAll = state.students.filter((s) =>
-    Boolean(s.commitment.studentConfirmedAt)
-  ).length;
-  const committedFocus = focusStudents.filter((s) =>
     Boolean(s.commitment.studentConfirmedAt)
   ).length;
   const parentSigned = state.students.filter((s) =>
@@ -273,17 +267,9 @@ export async function generateResearchSummaryPDFBytes(
   ctx.font = '400 19px "Be Vietnam Pro", system-ui, sans-serif';
   y = drawWrappedCanvasText(
     ctx,
-    `• Cả lớp: ${state.students.length} học sinh ẩn danh (${committedAll} em đã xác nhận cam kết, ${parentSigned} phụ huynh đã kí đồng hành).`,
+    `• Cả lớp: ${state.students.length} học sinh (${committedAll} em đã xác nhận cam kết, ${parentSigned} phụ huynh đã kí đồng hành).`,
     72,
     y,
-    1100,
-    30
-  );
-  y = drawWrappedCanvasText(
-    ctx,
-    `• Nhóm trọng tâm: ${focusStudents.length} học sinh (${committedFocus} em đã chốt cam kết tính tới thời điểm xuất báo cáo).`,
-    72,
-    y + 4,
     1100,
     30
   );
@@ -309,7 +295,7 @@ export async function generateResearchSummaryPDFBytes(
   ctx.fillStyle = "#1D242B";
   ctx.font = 'bold 24px "Be Vietnam Pro", system-ui, sans-serif';
   ctx.fillText(
-    "2. Đối chiếu Trước – Sau theo 4 mức mô tả định tính (Nhóm trọng tâm & Cả lớp)",
+    "2. Đối chiếu Trước – Sau theo 4 mức mô tả định tính (Cả lớp)",
     64,
     y
   );
@@ -321,8 +307,8 @@ export async function generateResearchSummaryPDFBytes(
   ctx.fillStyle = "#223A1E";
   ctx.font = 'bold 17px "Be Vietnam Pro", system-ui, sans-serif';
   ctx.fillText("Tiêu chí năng lực", 80, y + 29);
-  ctx.fillText("Nhóm trọng tâm (Trước -> Sau)", 440, y + 29);
-  ctx.fillText("Cả lớp ở mức Khá rõ nét / Vững vàng", 815, y + 29);
+  ctx.fillText("Mức phổ biến (Trước -> Sau)", 440, y + 29);
+  ctx.fillText("Số HS ở mức Khá rõ nét / Vững vàng", 815, y + 29);
   y += 46;
 
   const countHigh = (list: Student[], period: "before" | "after", key: (typeof RUBRIC_CRITERIA)[number]["key"]) =>
@@ -365,8 +351,8 @@ export async function generateResearchSummaryPDFBytes(
     ctx.font = '600 17px "Be Vietnam Pro", system-ui, sans-serif';
     ctx.fillText(c.title, 80, y + 33);
 
-    const fBefore = modeLevel(focusStudents, "before", c.key);
-    const fAfter = modeLevel(focusStudents, "after", c.key);
+    const fBefore = modeLevel(state.students, "before", c.key);
+    const fAfter = modeLevel(state.students, "after", c.key);
     ctx.font = '400 17px "Be Vietnam Pro", system-ui, sans-serif';
     ctx.fillText(`${fBefore}  →  ${fAfter}`, 440, y + 33);
 
@@ -428,7 +414,7 @@ export async function generateResearchSummaryPDFBytes(
   ctx.fillStyle = "#64748B";
   ctx.font = 'italic 16px "Be Vietnam Pro", system-ui, sans-serif';
   ctx.fillText(
-    "Lưu ý nghiên cứu: Toàn bộ dữ liệu xuất hoàn toàn ẩn danh, sử dụng thang mô tả 4 mức bằng lời, không chấm điểm và không xếp hạng học sinh.",
+    "Lưu ý: Dữ liệu xuất sử dụng thang mô tả 4 mức bằng lời, không chấm điểm và không xếp hạng học sinh.",
     64,
     height - 70
   );
@@ -444,7 +430,7 @@ export async function generateResearchSummaryPDFBytes(
 }
 
 /**
- * Bundles 3 anonymized CSVs + 1-page Vietnamese PDF summary into a single .zip package.
+ * Bundles 3 CSVs + 1-page Vietnamese PDF summary into a single .zip package.
  */
 export async function exportResearchZipPackage(state: AppState): Promise<void> {
   const zip = new JSZip();
@@ -512,14 +498,14 @@ export function parseContentJSON(rawJson: string): {
 }
 
 /**
- * Exports ONLY the requesting student's personal journey data using their anonymized code.
+ * Exports ONLY the requesting student's personal journey data.
  */
 export function exportStudentPersonalDataJSON(
   student: Student,
   aiMessages: AIMessage[],
   meetings: Meeting[]
 ): void {
-  const safeCode = student.anonymizedLabel || student.code;
+  const safeCode = student.fullName;
   const studentMsgs = aiMessages
     .filter((m) => m.studentId === student.id && m.visibleToStudent)
     .map((m) => ({
@@ -544,7 +530,7 @@ export function exportStudentPersonalDataJSON(
     }));
 
   const payload = {
-    anonymizedCode: safeCode,
+    fullName: student.fullName,
     className: student.className,
     exportedAt: new Date().toISOString(),
     privacyConsentAccepted: student.privacyConsentAccepted,
@@ -558,11 +544,7 @@ export function exportStudentPersonalDataJSON(
     consideredOptions: student.consideredOptions,
     journal: student.journal,
     scenarioReflections: student.scenarioReflections || [],
-    commitment: {
-      ...student.commitment,
-      studentDisplayCode: safeCode,
-      studentNamePlaceholder: `${safeCode} (Ẩn danh)`,
-    },
+    commitment: student.commitment,
     aiConversations: studentMsgs,
     meetings: studentMeetings,
   };

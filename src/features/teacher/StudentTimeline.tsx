@@ -208,7 +208,7 @@ export const StudentTimeline: React.FC<StudentTimelineProps> = ({
               Dòng thời gian hành trình đầy đủ ({visibleEvents.length} mốc)
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Tổng hợp liên thông từ hồ sơ soi chiếu, đổi phương án, trải nghiệm, nhật ký, AI, họp ba bên đến phiếu cam kết.
+              Tổng hợp từ hồ sơ soi chiếu, đổi phương án, trải nghiệm, nhật ký, AI, họp ba bên đến phiếu cam kết.
             </p>
           </div>
         </div>

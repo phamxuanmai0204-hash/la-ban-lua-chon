@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { RoleSelect } from "./components/RoleSelect";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthScreen } from "./components/AuthScreen";
 import { ProjectIntro } from "./components/ProjectIntro";
 import { SettingsModal } from "./components/SettingsModal";
@@ -8,22 +7,16 @@ import { OfflineIndicator } from "./components/OfflineIndicator";
 import { StudentJourney } from "./features/student-journey/StudentJourney";
 import { TeacherDashboard } from "./features/teacher/TeacherDashboard";
 import { ParentView } from "./features/parent/ParentView";
-import { SchoolManagerDashboard } from "./features/school-manager/SchoolManagerDashboard";
-import { createInitialAppState } from "./data/mockData";
+import { createInitialAppState, createStudentProfile } from "./data/mockData";
 import {
   buildLocalRoster,
   fetchSchoolRoster,
-  fetchSchoolStats,
   addParentLink,
   changeParentPin,
-  AuthError,
 } from "./services/auth";
 import {
-  DEMO_PARENT_PIN,
-  MAX_CHILDREN_PER_PARENT,
   schoolClassLabel,
   type SchoolRoster,
-  type SchoolStats,
 } from "./data/schoolClasses";
 import {
   createActiveStorageService,
@@ -58,41 +51,12 @@ import type {
   LinkedChild,
   Meeting,
   Pathway,
-  Role,
   Student,
   ThematicCodeItem,
 } from "./types";
 
-function defaultStudentIdForRole(role: Role, students: Student[]): string {
-  if (role === "parent") {
-    const child =
-      students.find((s) => s.isCaseStudy && s.shareWithParent) ??
-      students.find((s) => s.shareWithParent) ??
-      students[0];
-    return child?.id ?? "hs-02";
-  }
-  const student = students.find((s) => s.isCaseStudy) ?? students[0];
-  return student?.id ?? "hs-01";
-}
-
-/**
- * Con của phụ huynh có thể là học sinh mẫu (có sẵn hồ sơ) hoặc tài khoản học sinh
- * mới đăng ký (id dạng "acc:<id>"). Với tài khoản mới, dùng hồ sơ mẫu làm khung
- * hiển thị để phụ huynh vẫn thấy đúng cấu trúc không gian đồng hành.
- */
-function resolveParentStudent(
-  childId: string | undefined,
-  students: Student[]
-): Student | null {
-  if (!childId) return null;
-  const direct = students.find((s) => s.id === childId);
-  if (direct) return direct;
-  const template =
-    students.find((s) => s.isCaseStudy && s.shareWithParent) ??
-    students.find((s) => s.isCaseStudy) ??
-    students[0];
-  if (!template) return null;
-  return { ...template, id: childId, shareWithParent: true };
+function accountStudentId(accountId: string): string {
+  return `acc:${accountId}`;
 }
 
 function childOptionLabel(link: LinkedChild): string {
@@ -110,19 +74,14 @@ export default function App() {
   const [session, setSession] = useState<AuthSession | null>(() =>
     getStoredSession()
   );
-  const [entryView, setEntryView] = useState<"auth" | "demo">(() =>
-    getStoredSession() ? "demo" : "auth"
-  );
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
-  const [activeRole, setActiveRole] = useState<Role | null>(
-    () => getStoredSession()?.user.role ?? null
-  );
-  const [activeStudentId, setActiveStudentId] = useState<string>(() =>
-    getStoredSession()?.user.role === "parent" ? "hs-02" : "hs-01"
-  );
-  const [demoChildLinks, setDemoChildLinks] = useState<LinkedChild[]>([]);
+  const [activeChildId, setActiveChildId] = useState<string | null>(() => {
+    const stored = getStoredSession();
+    return stored?.user.role === "parent"
+      ? stored.user.linkedChildren?.[0]?.studentId ?? null
+      : null;
+  });
   const [schoolRoster, setSchoolRoster] = useState<SchoolRoster | null>(null);
-  const [schoolStats, setSchoolStats] = useState<SchoolStats | null>(null);
   const [showProjectIntro, setShowProjectIntro] = useState(false);
   const [showHowAIWorks, setShowHowAIWorks] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -130,7 +89,7 @@ export default function App() {
   const lastSerializedRef = useRef<string>("");
   const pendingOfflineSyncRef = useRef<boolean>(false);
 
-  // Load state from active StorageService (with v1 -> v2 migration) and subscribe
+  // Load state from active StorageService (with schema migration) and subscribe
   useEffect(() => {
     let active = true;
     setIsHydrated(false);
@@ -238,6 +197,43 @@ export default function App() {
     return () => window.removeEventListener("online", handleBackOnline);
   }, [storageService]);
 
+  // Học sinh tự đăng ký: hồ sơ được tạo từ chính tài khoản, không có dữ liệu mẫu.
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!session) return;
+
+    const desiredProfiles: Student[] = [];
+    if (session.user.role === "student") {
+      const studentId = accountStudentId(session.user.id);
+      if (!appState.students.some((s) => s.id === studentId)) {
+        desiredProfiles.push(
+          createStudentProfile(
+            studentId,
+            session.user.fullName,
+            session.user.className
+          )
+        );
+      }
+    } else if (session.user.role === "parent") {
+      for (const link of session.user.linkedChildren ?? []) {
+        if (!appState.students.some((s) => s.id === link.studentId)) {
+          desiredProfiles.push(
+            createStudentProfile(link.studentId, link.displayName, link.className)
+          );
+        }
+      }
+    }
+
+    if (desiredProfiles.length === 0) return;
+    setAppState((prev) => {
+      const missing = desiredProfiles.filter(
+        (profile) => !prev.students.some((s) => s.id === profile.id)
+      );
+      if (missing.length === 0) return prev;
+      return { ...prev, students: [...prev.students, ...missing] };
+    });
+  }, [isHydrated, session, appState.students]);
+
   useEffect(() => {
     const root = document.documentElement;
     if (appState.settings.darkMode) {
@@ -286,28 +282,6 @@ export default function App() {
       await FirebaseStorageAdapter.disposeCustomApps();
       setStorageService(createActiveStorageService());
     }
-  };
-
-  const handleAcceptPrivacyConsent = (studentId: string) => {
-    const now = new Date().toLocaleString("vi-VN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    setAppState((prev) => ({
-      ...prev,
-      students: prev.students.map((s) =>
-        s.id === studentId
-          ? {
-              ...s,
-              privacyConsentAccepted: true,
-              privacyConsentAcceptedAt: s.privacyConsentAcceptedAt || now,
-            }
-          : s
-      ),
-    }));
   };
 
   const handleUpdateStudent = (updated: Student) => {
@@ -363,7 +337,7 @@ export default function App() {
     const newMsg: AIMessage = {
       id: msgId,
       studentId: latestStudent.id,
-      studentCode: latestStudent.code,
+      studentName: latestStudent.fullName,
       createdAt: now,
       triggerReason,
       studentText: compactContext.studentMessage,
@@ -383,7 +357,7 @@ export default function App() {
       id: `log-${Date.now()}`,
       messageId: msgId,
       studentId: latestStudent.id,
-      studentCode: latestStudent.code,
+      studentName: latestStudent.fullName,
       action: res.layer1Triggered
         ? "lọc lớp 1"
         : res.layer2Filtered
@@ -448,7 +422,7 @@ export default function App() {
       id: `log-${Date.now()}`,
       messageId: updated.id,
       studentId: updated.studentId,
-      studentCode: updated.studentCode,
+      studentName: updated.studentName,
       action: logMeta.action,
       actor: "Giáo viên chủ nhiệm",
       timestamp: now,
@@ -560,8 +534,6 @@ export default function App() {
       if (current && current.token !== stored.token) return;
       clearStoredSession();
       setSession(null);
-      setActiveRole(null);
-      setEntryView("auth");
       setAccountNotice(
         "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục."
       );
@@ -572,53 +544,16 @@ export default function App() {
     };
   }, []);
 
-  // Roster lớp/học sinh và thống kê trường cho chọn lớp + liên kết phụ huynh.
+  // Roster lớp/học sinh (từ tài khoản đã đăng ký) dùng cho liên kết phụ huynh.
   useEffect(() => {
     let active = true;
-    void fetchSchoolRoster(appState.students).then((roster) => {
+    void fetchSchoolRoster().then((roster) => {
       if (active) setSchoolRoster(roster);
-    });
-    void fetchSchoolStats().then((stats) => {
-      if (active) setSchoolStats(stats);
     });
     return () => {
       active = false;
     };
-  }, [session, appState.students.length]);
-
-  // Quick-demo phụ huynh vào hồ sơ được chia sẻ; phụ huynh có liên kết thì giữ đúng con đang chọn.
-  useEffect(() => {
-    if (session?.user.role === "parent") return;
-    if (activeRole !== "parent") return;
-    if (demoChildLinks.some((link) => link.studentId === activeStudentId)) return;
-    const current = appState.students.find((s) => s.id === activeStudentId);
-    if (current?.shareWithParent) return;
-    const child = appState.students.find(
-      (s) => s.isCaseStudy && s.shareWithParent
-    );
-    if (child) setActiveStudentId(child.id);
-  }, [session, activeRole, appState.students, activeStudentId, demoChildLinks]);
-
-  // Quick-demo phụ huynh: mặc định mở hồ sơ mẫu đang chia sẻ và vẫn giữ con đó
-  // trong danh sách "Chọn con" sau khi liên kết thêm con khác bằng mã PIN.
-  useEffect(() => {
-    if (session || activeRole !== "parent") return;
-    if (demoChildLinks.length > 0) return;
-    const initial =
-      appState.students.find((s) => s.isCaseStudy && s.shareWithParent) ??
-      appState.students.find((s) => s.shareWithParent) ??
-      appState.students[0];
-    if (!initial) return;
-    setDemoChildLinks([
-      {
-        studentId: initial.id,
-        className: initial.className,
-        displayName: `${initial.code} (${initial.anonymizedLabel})`,
-        linkedAt: new Date().toISOString(),
-      },
-    ]);
-    setActiveStudentId(initial.id);
-  }, [session, activeRole, demoChildLinks.length, appState.students]);
+  }, [session]);
 
   useEffect(() => {
     if (!accountNotice) return;
@@ -631,19 +566,11 @@ export default function App() {
     savedOffline: boolean
   ) => {
     setSession(next);
-    const firstChild =
-      next.user.role === "parent" ? next.user.linkedChildren?.[0]?.studentId : undefined;
-    const sameClassProfile =
-      next.user.role === "student" && next.user.className
-        ? appState.students.find((s) => s.className === next.user.className)?.id
-        : undefined;
-    setActiveStudentId(
-      firstChild ??
-        sameClassProfile ??
-        defaultStudentIdForRole(next.user.role, appState.students)
+    setActiveChildId(
+      next.user.role === "parent"
+        ? next.user.linkedChildren?.[0]?.studentId ?? null
+        : null
     );
-    setActiveRole(next.user.role);
-    setEntryView("demo");
     setAccountNotice(
       savedOffline
         ? "Tài khoản đã được lưu trên thiết bị này. Bạn vẫn có thể đăng nhập khi ngoại tuyến."
@@ -652,66 +579,22 @@ export default function App() {
   };
 
   const handleLinkChild = async (input: {
-    classId: string;
     studentId: string;
     pin: string;
   }): Promise<void> => {
-    if (session) {
-      const result = await addParentLink(session, input);
-      setSession(result.session);
-      setActiveStudentId(input.studentId);
-      setAccountNotice(
-        result.savedOffline
-          ? "Chưa kết nối được máy chủ nên liên kết chỉ lưu trên thiết bị này. Khi có mạng, hãy liên kết lại để đồng bộ."
-          : "Đã liên kết con thành công. Bạn có thể chuyển đổi giữa các con ở thanh phía trên."
-      );
-      return;
-    }
-
-    // Chế độ xem thử: chỉ liên kết học sinh mẫu với mã PIN mặc định 1234.
-    const entry = (schoolRoster ?? buildLocalRoster(appState.students)).classes
-      .find((cls) => cls.id === input.classId)
-      ?.students.find((student) => student.id === input.studentId);
-    if (!entry) {
-      throw new AuthError(
-        "Không tìm thấy học sinh này trong lớp đã chọn. Vui lòng kiểm tra lại.",
-        { code: "CHILD_NOT_FOUND", field: "childStudentId" }
-      );
-    }
-    if (entry.source !== "demo") {
-      throw new AuthError(
-        "Học sinh này có tài khoản riêng. Hãy đăng nhập bằng tài khoản Phụ huynh để liên kết, hoặc chọn học sinh mẫu (mã PIN 1234).",
-        { code: "DEMO_ONLY", field: "childStudentId" }
-      );
-    }
-    if (demoChildLinks.length >= MAX_CHILDREN_PER_PARENT) {
-      throw new AuthError(
-        `Mỗi tài khoản phụ huynh chỉ liên kết tối đa ${MAX_CHILDREN_PER_PARENT} con.`,
-        { code: "MAX_CHILDREN", field: "form" }
-      );
-    }
-    if (demoChildLinks.some((link) => link.studentId === input.studentId)) {
-      throw new AuthError("Học sinh này đã được liên kết rồi.", {
-        code: "ALREADY_LINKED",
-        field: "childStudentId",
-      });
-    }
-    if (input.pin.trim() !== DEMO_PARENT_PIN) {
-      throw new AuthError(
-        "Mã PIN chưa đúng nên chưa thể liên kết. Học sinh mẫu có mã PIN mặc định 1234.",
-        { code: "INVALID_PIN", field: "childPin" }
-      );
-    }
-    setDemoChildLinks((prev) => [
-      ...prev,
-      {
-        studentId: input.studentId,
-        className: input.classId,
-        displayName: entry.displayName,
-        linkedAt: new Date().toISOString(),
-      },
-    ]);
-    setActiveStudentId(input.studentId);
+    if (!session) return;
+    const result = await addParentLink(session, {
+      classId: "",
+      studentId: input.studentId,
+      pin: input.pin,
+    });
+    setSession(result.session);
+    setActiveChildId(input.studentId);
+    setAccountNotice(
+      result.savedOffline
+        ? "Chưa kết nối được máy chủ nên liên kết chỉ lưu trên thiết bị này. Khi có mạng, hãy liên kết lại để đồng bộ."
+        : "Đã liên kết con thành công. Bạn có thể chuyển đổi giữa các con ở thanh phía trên."
+    );
   };
 
   const handleChangeParentPin = async (pin: string): Promise<void> => {
@@ -723,81 +606,84 @@ export default function App() {
   const handleLogout = () => {
     const current = session;
     setSession(null);
-    setActiveRole(null);
-    setEntryView("auth");
+    setActiveChildId(null);
     setAccountNotice(null);
-    setDemoChildLinks([]);
+    setShowSettings(false);
     void logoutAccount(current);
   };
 
   const offlineSession = Boolean(session?.token.startsWith("local-"));
 
-  const activeParentLinks: LinkedChild[] =
-    session?.user.role === "parent"
-      ? session.user.linkedChildren ?? []
-      : demoChildLinks;
+  const parentLinks = useMemo<LinkedChild[]>(
+    () =>
+      session?.user.role === "parent"
+        ? session.user.linkedChildren ?? []
+        : [],
+    [session]
+  );
 
-  const activeStudent =
-    activeRole === "parent"
-      ? resolveParentStudent(activeStudentId, appState.students)
-      : appState.students.find((s) => s.id === activeStudentId) ||
-        appState.students[0];
+  const activeStudent: Student | null = useMemo(() => {
+    if (!session) return null;
+    if (session.user.role === "student") {
+      return (
+        appState.students.find(
+          (s) => s.id === accountStudentId(session.user.id)
+        ) ?? null
+      );
+    }
+    if (session.user.role === "parent" && activeChildId) {
+      return appState.students.find((s) => s.id === activeChildId) ?? null;
+    }
+    return null;
+  }, [session, appState.students, activeChildId]);
 
-  const parentChildOptions = activeParentLinks.map((link) => ({
+  const parentChildOptions = parentLinks.map((link) => ({
     id: link.studentId,
     label: childOptionLabel(link),
   }));
   if (
-    activeRole === "parent" &&
     activeStudent &&
     !parentChildOptions.some((option) => option.id === activeStudent.id)
   ) {
     parentChildOptions.unshift({
       id: activeStudent.id,
-      label: `${activeStudent.code} (${activeStudent.anonymizedLabel}) · ${schoolClassLabel(
+      label: `${activeStudent.fullName} · ${schoolClassLabel(
         activeStudent.className
       )}`,
     });
   }
-  const parentRoster = schoolRoster ?? buildLocalRoster(appState.students);
+  const parentRoster = schoolRoster ?? buildLocalRoster();
+
+  const role = session?.user.role ?? null;
+  const isProfilePending =
+    Boolean(session) && (role === "student" || role === "parent") && !activeStudent;
 
   return (
     <>
       {showProjectIntro ? (
         <ProjectIntro onBack={() => setShowProjectIntro(false)} />
-      ) : !activeRole ? (
-        entryView === "auth" ? (
-          <AuthScreen
-            darkMode={appState.settings.darkMode}
-            onToggleDarkMode={handleToggleDarkMode}
-            onAuthenticated={handleAuthenticated}
-            onQuickDemo={() => setEntryView("demo")}
-            onOpenProjectIntro={() => setShowProjectIntro(true)}
-            students={appState.students}
-            roster={schoolRoster}
-          />
-        ) : (
-          <RoleSelect
-            students={appState.students}
-            darkMode={appState.settings.darkMode}
-            storageKind={storageService.kind}
-            account={session?.user ?? null}
-            offlineSession={offlineSession}
-            onLogout={session ? handleLogout : undefined}
-            onOpenAuth={() => setEntryView("auth")}
-            onToggleDarkMode={handleToggleDarkMode}
-            onResetSampleData={handleResetSampleData}
-            onSelectRole={(role, stuId) => {
-              setActiveStudentId(stuId);
-              setActiveRole(role);
-            }}
-            onAcceptPrivacyConsent={handleAcceptPrivacyConsent}
-            onOpenProjectIntro={() => setShowProjectIntro(true)}
-            onOpenHowAIWorks={() => setShowHowAIWorks(true)}
-            onOpenSettings={() => setShowSettings(true)}
-          />
-        )
-      ) : activeRole === "student" && activeStudent ? (
+      ) : !session || !role ? (
+        <AuthScreen
+          darkMode={appState.settings.darkMode}
+          onToggleDarkMode={handleToggleDarkMode}
+          onAuthenticated={handleAuthenticated}
+          onOpenProjectIntro={() => setShowProjectIntro(true)}
+          roster={schoolRoster}
+        />
+      ) : isProfilePending ? (
+        <div className="min-h-screen bg-[#FAFBFD] dark:bg-[#0F171E] flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Đang tải hồ sơ của em…
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2] underline cursor-pointer"
+          >
+            Đăng xuất
+          </button>
+        </div>
+      ) : role === "student" && activeStudent ? (
         <StudentJourney
           student={activeStudent}
           allStudents={appState.students}
@@ -811,13 +697,13 @@ export default function App() {
           onOpenHowAIWorks={() => setShowHowAIWorks(true)}
           onToggleDarkMode={handleToggleDarkMode}
           onChangeFontSize={handleChangeFontSize}
-          onExitRole={() => setActiveRole(null)}
-          account={session?.user ?? null}
+          onExitRole={handleLogout}
+          account={session.user}
           offlineSession={offlineSession}
-          onLogout={session ? handleLogout : undefined}
-          onChangeParentPin={session ? handleChangeParentPin : undefined}
+          onLogout={handleLogout}
+          onChangeParentPin={handleChangeParentPin}
         />
-      ) : activeRole === "teacher" ? (
+      ) : role === "teacher" ? (
         <TeacherDashboard
           appState={appState}
           onUpdateStudent={handleUpdateStudent}
@@ -833,12 +719,12 @@ export default function App() {
           onImportContent={handleImportContent}
           onOpenSettings={() => setShowSettings(true)}
           onToggleDarkMode={handleToggleDarkMode}
-          onExitRole={() => setActiveRole(null)}
-          account={session?.user ?? null}
+          onExitRole={handleLogout}
+          account={session.user}
           offlineSession={offlineSession}
-          onLogout={session ? handleLogout : undefined}
+          onLogout={handleLogout}
         />
-      ) : activeRole === "parent" && activeStudent ? (
+      ) : role === "parent" && activeStudent ? (
         <ParentView
           student={activeStudent}
           meetings={appState.meetings}
@@ -847,29 +733,15 @@ export default function App() {
           onUpdateMeeting={handleUpdateMeeting}
           onOpenHowAIWorks={() => setShowHowAIWorks(true)}
           onToggleDarkMode={handleToggleDarkMode}
-          onExitRole={() => setActiveRole(null)}
-          account={session?.user ?? null}
+          onExitRole={handleLogout}
+          account={session.user}
           offlineSession={offlineSession}
-          onLogout={session ? handleLogout : undefined}
+          onLogout={handleLogout}
           childOptions={parentChildOptions}
           selectedChildId={activeStudent.id}
-          onSelectChild={setActiveStudentId}
+          onSelectChild={setActiveChildId}
           roster={parentRoster}
-          demoLinkMode={!session}
           onLinkChild={handleLinkChild}
-        />
-      ) : activeRole === "school_admin" ? (
-        <SchoolManagerDashboard
-          appState={appState}
-          roster={parentRoster}
-          stats={schoolStats}
-          account={session?.user ?? null}
-          offlineSession={offlineSession}
-          onLogout={session ? handleLogout : undefined}
-          onExitRole={() => setActiveRole(null)}
-          onToggleDarkMode={handleToggleDarkMode}
-          onOpenHowAIWorks={() => setShowHowAIWorks(true)}
-          onOpenSettings={() => setShowSettings(true)}
         />
       ) : null}
 

@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { CompassLogo } from "../../components/CompassLogo";
 import { AccountMenu } from "../../components/AccountMenu";
-import { MAX_CHILDREN_PER_PARENT, DEMO_PARENT_PIN, type SchoolRoster } from "../../data/schoolClasses";
+import { StudentSummaryReport } from "../student-journey/StudentSummaryReport";
+import { MAX_CHILDREN_PER_PARENT, type SchoolRoster } from "../../data/schoolClasses";
 import type {
   AppSettings,
   AuthUser,
@@ -50,9 +51,7 @@ interface ParentViewProps {
   selectedChildId: string;
   onSelectChild: (studentId: string) => void;
   roster: SchoolRoster;
-  demoLinkMode?: boolean;
   onLinkChild?: (input: {
-    classId: string;
     studentId: string;
     pin: string;
   }) => Promise<void>;
@@ -65,7 +64,7 @@ const STEP_VERBAL_DESC: Record<
   THU: {
     title: "Bước 1 – THU (Thu thập thông tin)",
     meaning:
-      "Con đang tìm hiểu bức tranh các hướng đi mở sau lớp 9 (THPT, GDTX, Trung cấp nghề kết hợp văn hóa và đường liên thông) thay vì chỉ nghe lời đồn.",
+      "Con đang tìm hiểu bức tranh các hướng đi mở sau lớp 9 (THPT công lập, THPT tư thục, GDTX, Trung cấp nghề kết hợp văn hóa và Sơ cấp nghề) thay vì chỉ nghe lời đồn.",
   },
   LỌC: {
     title: "Bước 2 – LỌC (Đặt tiêu chí vừa sức)",
@@ -133,36 +132,30 @@ export const ParentView: React.FC<ParentViewProps> = ({
   selectedChildId,
   onSelectChild,
   roster,
-  demoLinkMode = false,
   onLinkChild,
 }) => {
   const [imgError, setImgError] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-  const [linkClassId, setLinkClassId] = useState(roster.classes[0]?.id ?? "");
   const [linkChildId, setLinkChildId] = useState("");
   const [linkPin, setLinkPin] = useState("");
   const [linkError, setLinkError] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
 
-  const linkClassStudents =
-    roster.classes.find((item) => item.id === linkClassId)?.students ?? [];
-  const linkedCount = account?.role === "parent"
-    ? account.linkedChildren?.length ?? 0
-    : 1;
+  const linkClassStudents = roster.classes.flatMap((item) => item.students);
+  const linkedCount = account?.linkedChildren?.length ?? 0;
 
   const openLinkDialog = () => {
     setLinkOpen(true);
     setLinkError("");
     setLinkPin("");
     setLinkChildId("");
-    setLinkClassId(roster.classes[0]?.id ?? "");
   };
 
   const handleLinkSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!onLinkChild || linkBusy) return;
     if (!linkChildId) {
-      setLinkError("Vui lòng chọn họ tên con trong lớp.");
+      setLinkError("Vui lòng chọn họ tên con trong danh sách.");
       return;
     }
     if (!/^\d{4}$/.test(linkPin)) {
@@ -173,7 +166,6 @@ export const ParentView: React.FC<ParentViewProps> = ({
     setLinkError("");
     try {
       await onLinkChild({
-        classId: linkClassId,
         studentId: linkChildId,
         pin: linkPin,
       });
@@ -281,7 +273,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">
-              Góc Phụ huynh · {student.code} (Lớp {student.className})
+              Góc Phụ huynh · {student.fullName} (Lớp {student.className})
             </span>
             <span aria-hidden="true" className="text-slate-400">
               ·
@@ -310,9 +302,9 @@ export const ParentView: React.FC<ParentViewProps> = ({
                 <button
                   type="button"
                   onClick={openLinkDialog}
-                  disabled={!demoLinkMode && linkedCount >= MAX_CHILDREN_PER_PARENT}
+                  disabled={linkedCount >= MAX_CHILDREN_PER_PARENT}
                   title={
-                    !demoLinkMode && linkedCount >= MAX_CHILDREN_PER_PARENT
+                    linkedCount >= MAX_CHILDREN_PER_PARENT
                       ? `Mỗi tài khoản chỉ liên kết tối đa ${MAX_CHILDREN_PER_PARENT} con`
                       : "Thêm con bằng mã PIN"
                   }
@@ -359,7 +351,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-[#133C42] dark:text-[#B3DEE2]">
-                Chặng hành trình hiện tại của con ({student.code})
+                Chặng hành trình hiện tại của con ({student.fullName})
               </p>
               <h1 className="text-lg sm:text-xl font-bold">{stepInfo.title}</h1>
               <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
@@ -395,6 +387,10 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
           </div>
         </section>
+
+        {student.summary && student.shareWithParent && (
+          <StudentSummaryReport summary={student.summary} audience="parent" />
+        )}
 
         {/* Gợi ý trò chuyện với con: 3 câu hỏi mở theo bước hiện tại */}
         <section
@@ -454,7 +450,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
                   Con đã bật chia sẻ hồ sơ cùng bố mẹ
                 </p>
                 <h2 className="text-xl font-bold mt-0.5">
-                  Hồ sơ tự soi chiếu của {student.code} · Bước {student.currentStep}
+                  Hồ sơ tự soi chiếu của {student.fullName} · Bước {student.currentStep}
                 </h2>
               </div>
 
@@ -527,7 +523,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
               ) : (
                 <div className="p-8 text-center space-y-2">
                   <BookOpen className="w-10 h-10 mx-auto text-[#223A1E]" />
-                  <p className="text-sm font-semibold">Học nghề vẫn có đường liên thông</p>
+                  <p className="text-sm font-semibold">Học nghề vẫn có cơ hội học tiếp</p>
                 </div>
               )}
             </div>
@@ -544,7 +540,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
                   Nhiều bố mẹ lo lắng rằng nếu con không vào lớp 10 THPT mà chọn Trung cấp nghề thì cánh cửa học vấn sẽ khép lại. Thực tế hiện nay, học sinh tốt nghiệp THCS vào học Trung cấp nghề có thể học song song chương trình văn hóa THPT.
                 </p>
                 <p>
-                  Sau khi có bằng Trung cấp nghề và hoàn thành văn hóa, con hoàn toàn có thể dự tuyển hoặc học liên thông lên bậc Cao đẳng, rồi Đại học theo quy định hiện hành — hoặc đi làm sớm để tích lũy tay nghề, thu nhập rồi quay lại học tiếp khi đã sẵn sàng.
+                  Sau khi có bằng Trung cấp nghề và hoàn thành văn hóa, con hoàn toàn có thể dự tuyển hoặc học tiếp lên bậc Cao đẳng nghề, rồi Đại học theo quy định hiện hành — hoặc đi làm sớm để tích lũy tay nghề, thu nhập rồi quay lại học tiếp khi đã sẵn sàng.
                 </p>
                 <p className="font-medium text-[#133C42] dark:text-[#B3DEE2] inline-flex items-center gap-1.5">
                   <ArrowUpRight className="w-4 h-4 shrink-0" />
@@ -594,7 +590,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
 
           {childMeetings.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Hiện chưa có lịch họp ba bên nào được tạo cho {student.code}.
+              Hiện chưa có lịch họp ba bên nào được tạo cho {student.fullName}.
             </p>
           ) : (
             <div className="space-y-3">
@@ -754,8 +750,8 @@ export const ParentView: React.FC<ParentViewProps> = ({
                   Thêm con vào tài khoản
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
-                  Chọn đúng lớp và họ tên con, sau đó nhập mã PIN 4 số do con
-                  chia sẻ để liên kết hồ sơ.
+                  Chọn họ tên con, sau đó nhập mã PIN 4 số do con chia sẻ để
+                  liên kết hồ sơ.
                 </p>
               </div>
               <button
@@ -769,57 +765,29 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
 
             <form onSubmit={handleLinkSubmit} className="space-y-3.5" noValidate>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label
-                    htmlFor="link-child-class"
-                    className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
-                  >
-                    Lớp của con
-                  </label>
-                  <select
-                    id="link-child-class"
-                    value={linkClassId}
-                    onChange={(e) => {
-                      setLinkClassId(e.target.value);
-                      setLinkChildId("");
-                      setLinkError("");
-                    }}
-                    className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396]"
-                  >
-                    {roster.classes.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="link-child-name"
-                    className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
-                  >
-                    Họ tên con
-                  </label>
-                  <select
-                    id="link-child-name"
-                    value={linkChildId}
-                    onChange={(e) => {
-                      setLinkChildId(e.target.value);
-                      setLinkError("");
-                    }}
-                    className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396]"
-                  >
-                    <option value="">— Chọn họ tên con —</option>
-                    {linkClassStudents.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.displayName}
-                        {item.source === "account" ? " (Tài khoản mới)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label
+                  htmlFor="link-child-name"
+                  className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5"
+                >
+                  Họ tên con
+                </label>
+                <select
+                  id="link-child-name"
+                  value={linkChildId}
+                  onChange={(e) => {
+                    setLinkChildId(e.target.value);
+                    setLinkError("");
+                  }}
+                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396]"
+                >
+                  <option value="">— Chọn họ tên con —</option>
+                  {linkClassStudents.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.fullName}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -856,19 +824,9 @@ export const ParentView: React.FC<ParentViewProps> = ({
               )}
 
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                {demoLinkMode ? (
-                  <>
-                    Đang ở chế độ trải nghiệm: học sinh mẫu dùng mã PIN mặc định{" "}
-                    <strong>{DEMO_PARENT_PIN}</strong>. Đăng nhập tài khoản phụ
-                    huynh để liên kết con thật.
-                  </>
-                ) : (
-                  <>
-                    Sai mã PIN sẽ bị từ chối liên kết. Mỗi tài khoản liên kết
-                    tối đa {MAX_CHILDREN_PER_PARENT} con và có thể chuyển đổi
-                    bằng mục &ldquo;Chọn con&rdquo; ở thanh trên.
-                  </>
-                )}
+                Sai mã PIN sẽ bị từ chối liên kết. Mỗi tài khoản liên kết tối đa{" "}
+                {MAX_CHILDREN_PER_PARENT} con và có thể chuyển đổi bằng mục
+                &ldquo;Chọn con&rdquo; ở thanh trên.
               </p>
 
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">

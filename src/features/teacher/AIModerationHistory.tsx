@@ -129,7 +129,7 @@ export const AIModerationHistory: React.FC<AIModerationHistoryProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="font-bold text-sm text-[#1D242B] dark:text-white">
-                    {log.studentCode}
+                    {log.studentName}
                   </span>
                   <span
                     className={`px-2.5 py-0.5 rounded-lg border text-xs font-semibold capitalize ${getActionBadge(
@@ -151,7 +151,7 @@ export const AIModerationHistory: React.FC<AIModerationHistoryProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs sm:text-sm">
                 <div className="p-3 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200/80 dark:border-slate-800">
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    Nội dung học sinh viết (ẩn danh)
+                    Nội dung học sinh viết
                   </p>
                   <p className="leading-relaxed">{log.studentText}</p>
                 </div>

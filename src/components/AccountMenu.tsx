@@ -13,8 +13,6 @@ const ROLE_CHIP_STYLES: Record<Role, string> = {
   student: "bg-[#B3DEE2]/50 text-[#133C42] dark:bg-[#B3DEE2]/20 dark:text-[#B3DEE2]",
   teacher: "bg-[#EAF2D7] text-[#223A1E] dark:bg-[#EAF2D7]/20 dark:text-[#EAF2D7]",
   parent: "bg-[#EFCFE3] text-[#4A1A2C] dark:bg-[#EFCFE3]/20 dark:text-[#EFCFE3]",
-  school_admin:
-    "bg-[#F3E7C9] text-[#5A3A0E] dark:bg-[#F3E7C9]/20 dark:text-[#F3E7C9]",
 };
 
 function initialOf(name: string): string {

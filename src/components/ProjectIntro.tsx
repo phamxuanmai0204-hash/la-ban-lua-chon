@@ -111,7 +111,7 @@ export const ProjectIntro: React.FC<ProjectIntroProps> = ({ onBack }) => {
               </p>
               <h3 className="text-lg font-bold">Vòng tròn đồng hành ba bên</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Kết nối Nhà trường – Gia đình – Cơ sở giáo dục nghề nghiệp qua lịch họp ba bên, câu chuyện “Người thật, việc thật” và minh bạch hóa đường liên thông sau học nghề.
+                Kết nối Nhà trường – Gia đình – Cơ sở giáo dục nghề nghiệp qua lịch họp ba bên, câu chuyện “Người thật, việc thật” và minh bạch hóa cơ hội học tiếp lên trình độ cao hơn.
               </p>
             </article>
           </div>
@@ -131,7 +131,7 @@ export const ProjectIntro: React.FC<ProjectIntroProps> = ({ onBack }) => {
             {[
               {
                 name: "1. THU",
-                detail: "Tìm hiểu bản đồ lộ trình THPT, GDTX, Trung cấp/Sơ cấp nghề và đường liên thông.",
+                detail: "Tìm hiểu bản đồ lộ trình THPT công lập, THPT tư thục, GDTX, Trung cấp nghề, Sơ cấp nghề và cơ hội học tiếp.",
               },
               {
                 name: "2. LỌC",

@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Sun,
   Moon,
-  Flag,
   Sparkles,
   BookOpenText,
   AlertCircle,
@@ -32,6 +31,7 @@ import { ThematicCodingStudio } from "./ThematicCodingStudio";
 import { ContentAdmin } from "./ContentAdmin";
 import { ResearchMode } from "./ResearchMode";
 import { StudentTimeline } from "./StudentTimeline";
+import { StudentSummaryReport } from "../student-journey/StudentSummaryReport";
 import { describeBehavioralSignals, JOURNEY_STEPS } from "../../data/mockData";
 import {
   SCHOOL_CLASSES,
@@ -138,7 +138,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   );
 
   // 3.1 Filters
-  const [onlyFocusGroup, setOnlyFocusGroup] = useState(false);
   const [onlyAttentionSignals, setOnlyAttentionSignals] = useState(false);
   const [onlyMissingDeadline, setOnlyMissingDeadline] = useState(false);
   const [onlyOverdueDeadline, setOnlyOverdueDeadline] = useState(false);
@@ -156,13 +155,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const [openedStudentId, setOpenedStudentId] = useState<string | null>(null);
   const [rubricStudentId, setRubricStudentId] = useState<string>(
-    students[0]?.id || "hs-01"
+    students[0]?.id || ""
   );
   const effectiveRubricStudentId = students.some(
     (s) => s.id === rubricStudentId
   )
     ? rubricStudentId
-    : students[0]?.id || "hs-01";
+    : students[0]?.id || "";
 
   // Journey Summary AI state (per opened student)
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -213,7 +212,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   };
 
   const filteredStudents = students.filter((s) => {
-    if (onlyFocusGroup && !s.isFocusGroup) return false;
     const signals = describeBehavioralSignals(s.signals);
     if (onlyAttentionSignals && signals.length === 0) return false;
     if (onlyMissingDeadline && Boolean(s.commitment.deadlineDate)) return false;
@@ -266,14 +264,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         });
         continue;
       }
-      if (s.signals.changeOptionCount >= 2 || (s.isFocusGroup && !s.commitment.deadlineDate)) {
+      if (s.signals.changeOptionCount >= 2) {
         items.push({
           student: s,
           priority: 50,
-          reason:
-            s.signals.changeOptionCount >= 2
-              ? `Em đã thay đổi phương án ${s.signals.changeOptionCount} lần và có câu băn khoăn trong nhật ký.`
-              : "Thuộc nhóm trọng tâm nhưng chưa đặt hạn chốt cho hành trình.",
+          reason: `Em đã thay đổi phương án ${s.signals.changeOptionCount} lần và có câu băn khoăn trong nhật ký.`,
         });
       }
     }
@@ -496,26 +491,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() =>
-                    onUpdateStudent({
-                      ...openedStudent,
-                      isFocusGroup: !openedStudent.isFocusGroup,
-                    })
-                  }
-                  className={`min-h-[42px] px-4 py-2 rounded-xl border text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer ${
-                    openedStudent.isFocusGroup
-                      ? "bg-[#EFCFE3]/60 border-[#E27396] text-[#4A1A2C] dark:text-[#EFCFE3]"
-                      : "bg-white dark:bg-[#17222C] border-slate-300 dark:border-slate-700"
-                  }`}
-                >
-                  <Flag className="w-4 h-4" />
-                  <span>
-                    Nhóm trọng tâm: {openedStudent.isFocusGroup ? "Đang đánh dấu" : "Không"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => {
                     setRubricStudentId(openedStudent.id);
                     setOpenedStudentId(null);
@@ -531,7 +506,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span className="text-lg font-bold text-[#1D242B] dark:text-white">
-                  Hồ sơ {openedStudent.code} ({openedStudent.anonymizedLabel})
+                  Hồ sơ {openedStudent.fullName}
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>Bước {openedStudent.currentStep}</span>
@@ -542,16 +517,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </span>
               </div>
 
-              {openedStudent.caseStudySummary && (
-                <p className="text-sm text-slate-700 dark:text-slate-200 bg-[#FAFBFD] dark:bg-[#0F171E] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
-                  <span className="font-semibold">Bối cảnh (dữ liệu mẫu): </span>
-                  {openedStudent.caseStudySummary}
-                </p>
-              )}
-
               {openedStudent.dataDeletionRequestedAt && (
                 <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-700 text-xs sm:text-sm text-rose-900 dark:text-rose-100">
-                  <strong>Yêu cầu xóa dữ liệu cá nhân:</strong> {openedStudent.anonymizedLabel} đã gửi yêu cầu xóa dữ liệu vào lúc{" "}
+                  <strong>Yêu cầu xóa dữ liệu cá nhân:</strong> {openedStudent.fullName} đã gửi yêu cầu xóa dữ liệu vào lúc{" "}
                   <span className="tabular-nums font-semibold">
                     {openedStudent.dataDeletionRequestedAt}
                   </span>
@@ -583,7 +551,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       Tóm tắt hành trình (AI hỗ trợ giáo viên)
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Viết 4–5 câu mô tả bằng lời từ hồ sơ ẩn danh; thầy/cô kiểm tra và chỉnh sửa trước khi dùng.
+                      Viết 4–5 câu mô tả bằng lời từ hồ sơ của em; thầy/cô kiểm tra và chỉnh sửa trước khi dùng.
                     </p>
                   </div>
                   <button
@@ -646,6 +614,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 )}
               </div>
             </section>
+
+            {openedStudent.summary && (
+              <StudentSummaryReport
+                summary={openedStudent.summary}
+                audience="teacher"
+              />
+            )}
 
             {/* 3.2: Dòng thời gian đầy đủ */}
             <StudentTimeline
@@ -724,7 +699,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
               <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
                 <h3 className="text-base font-bold">
-                  Phiếu cam kết điện tử của {openedStudent.code}
+                  Phiếu cam kết điện tử của {openedStudent.fullName}
                 </h3>
                 <div className="space-y-3 text-sm bg-[#FAFBFD] dark:bg-[#0F171E] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800">
                   <div>
@@ -808,7 +783,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <div className="space-y-1">
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-sm font-bold text-[#1D242B] dark:text-white">
-                                {item.student.code}
+                                {item.student.fullName}
                               </span>
                               <span className="text-[11px] font-semibold text-[#133C42] dark:text-[#B3DEE2]">
                                 {item.student.currentStep}
@@ -867,20 +842,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* 5 required filters */}
+                  {/* Bộ lọc trạng thái */}
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOnlyFocusGroup(!onlyFocusGroup)}
-                      className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        onlyFocusGroup
-                          ? "bg-[#EFCFE3]/70 border-[#E27396] text-[#4A1A2C]"
-                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-300 dark:border-slate-700"
-                      }`}
-                    >
-                      Nhóm trọng tâm ({students.filter((s) => s.isFocusGroup).length})
-                    </button>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -1088,12 +1051,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                     >
                                       <div className="flex items-center justify-between gap-1.5">
                                         <span className="text-xs font-bold">
-                                          {stu.code}
+                                          {stu.fullName}
                                         </span>
                                         <span className="text-[11px] text-slate-500">
-                                          {stu.isFocusGroup
-                                            ? "Trọng tâm"
-                                            : stu.anonymizedLabel}
+                                          {stu.currentStep}
                                         </span>
                                       </div>
                                       <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
@@ -1155,16 +1116,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               >
                                 <td className="py-3.5 px-4 align-top">
                                   <div className="font-bold">
-                                    {stu.code}
-                                    {stu.isCaseStudy && (
-                                      <span className="ml-2 text-xs font-medium text-[#9D2950] dark:text-[#EA9AB2]">
-                                        · Minh họa chi tiết
-                                      </span>
-                                    )}
+                                    {stu.fullName}
                                   </div>
                                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    {stu.anonymizedLabel}
-                                    {stu.isFocusGroup ? " · Nhóm trọng tâm" : ""}
+                                    Lớp {stu.className}
                                   </div>
                                 </td>
 

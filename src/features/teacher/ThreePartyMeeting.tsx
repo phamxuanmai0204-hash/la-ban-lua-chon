@@ -25,7 +25,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
   onAddMeeting,
   onUpdateMeeting,
 }) => {
-  const [studentId, setStudentId] = useState(students[0]?.id || "hs-01");
+  const [studentId, setStudentId] = useState(students[0]?.id || "");
   const [dateTime, setDateTime] = useState("2026-11-26 15:30");
   const [locationOrChannel, setLocationOrChannel] = useState(
     "Phòng tư vấn trường THCS"
@@ -52,7 +52,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
     setAgendaLoading(true);
     try {
       const res = await requestTeacherMeetingAgenda(stu);
-      setAgendaStudentCode(stu.code);
+      setAgendaStudentCode(stu.fullName);
       setAgendaOpening(res.openingNote);
       setAgendaQuestions(res.questions);
       setHasAgendaDraft(true);
@@ -85,7 +85,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
     onAddMeeting({
       id: `meet-${Date.now()}`,
       studentId: stu.id,
-      studentCode: stu.code,
+      studentName: stu.fullName,
       dateTime,
       locationOrChannel: locationOrChannel.trim() || "Phòng họp lớp",
       parentInvited,
@@ -131,7 +131,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
             <span>
               {agendaLoading
                 ? "AI đang soạn gợi ý..."
-                : `Gợi ý chương trình họp cho ${selectedStudent?.code || "HS"}`}
+                : `Gợi ý chương trình họp cho ${selectedStudent?.fullName || "học sinh"}`}
             </span>
           </button>
         </div>
@@ -155,7 +155,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
             >
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.code} ({s.anonymizedLabel})
+                  {s.fullName}
                 </option>
               ))}
             </select>
@@ -322,7 +322,7 @@ export const ThreePartyMeeting: React.FC<ThreePartyMeetingProps> = ({
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <span className="font-bold text-sm text-[#1D242B] dark:text-white">
-                      {m.studentCode}
+                      {m.studentName}
                     </span>
                     <span aria-hidden="true">·</span>
                     <span className="inline-flex items-center gap-1 tabular-nums">
