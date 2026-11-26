@@ -4,14 +4,9 @@ import {
   ArrowRight,
   PlusCircle,
   CheckCircle2,
-  ExternalLink,
   Info,
-  PlayCircle,
-  MessageSquareMore,
   Compass,
 } from "lucide-react";
-import { DEFAULT_PRACTITIONER_QUESTIONS } from "../../data/mockData";
-import { getYouTubeThumbnailUrl } from "../../utils/youtube";
 import type { Pathway, PathwayCategory, Student } from "../../types";
 
 interface PathwayMapProps {
@@ -52,10 +47,6 @@ export const PathwayMap: React.FC<PathwayMapProps> = ({
   const [selectedPathwayId, setSelectedPathwayId] = useState<string>(
     focusedPathwayId || pathways[0]?.id || ""
   );
-  const [failedThumbIds, setFailedThumbIds] = useState<Record<string, boolean>>(
-    {}
-  );
-
   useEffect(() => {
     if (focusedPathwayId) {
       setSelectedPathwayId(focusedPathwayId);
@@ -94,6 +85,256 @@ export const PathwayMap: React.FC<PathwayMapProps> = ({
           năng lực và điều kiện của bạn.
         </p>
       </div>
+
+      <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#EAF2D7]/70 dark:bg-[#EAF2D7]/15 flex items-center justify-center text-[#223A1E] dark:text-[#EAF2D7]">
+            <Map className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold">
+              Bản đồ lộ trình sau THCS
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+              Từ tốt nghiệp THCS, các hướng học có thể nối tiếp lên cao đẳng,
+              đại học hoặc vừa đi làm vừa học tiếp khi sẵn sàng.
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="min-w-[880px]">
+            <p className="sm:hidden mb-2 text-[11px] italic text-slate-500 dark:text-slate-400">
+              Vuốt ngang để xem đầy đủ sơ đồ.
+            </p>
+            <svg
+              viewBox="0 0 1040 600"
+              role="img"
+              aria-label="Bản đồ lộ trình sau THCS: từ tốt nghiệp THCS có 4 hướng đi gồm THPT công lập hoặc tư thục, giáo dục thường xuyên, trung cấp nghề và sơ cấp nghề. Các hướng học văn hóa nối lên cao đẳng và đại học; trung cấp nghề liên thông lên cao đẳng hoặc đi làm tích lũy tay nghề; cao đẳng học tiếp lên đại học; sơ cấp nghề đi làm hoặc học tiếp trung cấp khi sẵn sàng."
+              className="w-full h-auto"
+            >
+              <defs>
+                <marker
+                  id="route-arrow"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#E27396" />
+                </marker>
+                <marker
+                  id="route-arrow-strong"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#9D2950" />
+                </marker>
+              </defs>
+
+              {/* Điểm xuất phát toả ra 4 hướng */}
+              <path
+                d="M 190 282 C 240 282, 246 128, 300 128"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 190 294 C 244 294, 250 248, 300 248"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 190 306 C 244 306, 250 368, 300 368"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 190 320 C 240 320, 246 492, 300 492"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+
+              {/* Nhóm nối lên Cao đẳng */}
+              <path
+                d="M 582 108 C 634 108, 650 76, 736 76"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 582 228 C 642 228, 654 94, 736 94"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 582 348 C 648 348, 662 112, 736 112"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <text
+                x="635"
+                y="347"
+                textAnchor="middle"
+                transform="rotate(-57 635 347)"
+                fill="#9D2950"
+                className="dark:fill-[#F4B8CB]"
+                fontSize="11.5"
+                fontWeight="600"
+                fontStyle="italic"
+              >
+                liên thông
+              </text>
+
+              {/* Nhóm nối xuống Đại học */}
+              <path
+                d="M 582 146 C 640 146, 652 248, 736 248"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 582 266 C 640 268, 656 266, 736 266"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              {/* Cao đẳng học tiếp lên đại học */}
+              <path
+                d="M 849 150 L 849 204"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+
+              {/* Trung cấp, sơ cấp nghề đi làm; sơ cấp học tiếp trung cấp */}
+              <path
+                d="M 582 396 C 648 396, 700 460, 736 468"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 582 492 L 736 492"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+              <path
+                d="M 444 440 L 444 418"
+                fill="none"
+                stroke="#E27396"
+                strokeWidth="2.5"
+                markerEnd="url(#route-arrow)"
+              />
+
+              <foreignObject x="20" y="252" width="170" height="96">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#9D2950]/50 bg-[#E27396] px-2 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[15px] font-bold leading-tight text-[#2B111A]">
+                    Tốt nghiệp THCS
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-[#2B111A]/70">
+                    Lớp 9
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="306" y="84" width="276" height="88">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#EA9AB2] bg-[#EFCFE3] dark:bg-[#EFCFE3]/15 dark:border-[#EA9AB2]/60 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[13.5px] font-bold leading-snug text-[#4A1A2C] dark:text-[#EFCFE3]">
+                    THPT công lập / tư thục
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] font-medium leading-snug text-[#4A1A2C]/75 dark:text-[#EFCFE3]/80">
+                    (học văn hóa THPT)
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="306" y="204" width="276" height="88">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#9DBB7A] bg-[#EAF2D7] dark:bg-[#EAF2D7]/15 dark:border-[#EAF2D7]/50 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[13.5px] font-bold leading-snug text-[#223A1E] dark:text-[#EAF2D7]">
+                    Giáo dục thường xuyên
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] font-medium leading-snug text-[#223A1E]/75 dark:text-[#EAF2D7]/80">
+                    (học văn hóa THPT)
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="306" y="324" width="276" height="88">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#B3DEE2] bg-[#B3DEE2]/75 dark:bg-[#B3DEE2]/15 dark:border-[#B3DEE2]/60 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[13.5px] font-bold leading-snug text-[#133C42] dark:text-[#B3DEE2]">
+                    Trung cấp nghề
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] font-medium leading-snug text-[#133C42]/75 dark:text-[#B3DEE2]/80">
+                    (có thể kết hợp học văn hóa THPT)
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="306" y="444" width="276" height="96">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#E27396] bg-[#EA9AB2] dark:bg-[#EA9AB2]/25 dark:border-[#EA9AB2]/60 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[13.5px] font-bold leading-snug text-[#2B111A] dark:text-[#EFCFE3]">
+                    Sơ cấp nghề
+                  </p>
+                  <p className="mt-0.5 text-[10.5px] font-medium leading-snug text-[#2B111A]/75 dark:text-[#EFCFE3]/80">
+                    (đào tạo nhanh kỹ năng)
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="744" y="40" width="210" height="108">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#9DBB7A] bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 dark:border-[#EAF2D7]/60 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[15px] font-bold leading-tight text-[#223A1E] dark:text-[#EAF2D7]">
+                    Cao đẳng
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="744" y="212" width="210" height="108">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#9DBB7A] bg-[#EAF2D7]/70 dark:bg-[#EAF2D7]/15 dark:border-[#EAF2D7]/50 px-3 py-2 flex flex-col items-center justify-center text-center shadow-sm">
+                  <p className="text-[15px] font-bold leading-tight text-[#223A1E] dark:text-[#EAF2D7]">
+                    Đại học
+                  </p>
+                </div>
+              </foreignObject>
+
+              <foreignObject x="744" y="444" width="276" height="96">
+                <div className="h-full w-full rounded-[16px] border-2 border-[#E27396] bg-[#EA9AB2] dark:bg-[#EA9AB2]/25 dark:border-[#EA9AB2]/60 px-3 py-2 flex items-center justify-center text-center shadow-sm">
+                  <p className="text-[13px] font-semibold leading-snug text-[#2B111A] dark:text-[#EFCFE3]">
+                    Đi làm, tích lũy tay nghề,
+                    <br />
+                    học tiếp khi sẵn sàng
+                  </p>
+                </div>
+              </foreignObject>
+            </svg>
+          </div>
+        </div>
+      </section>
 
       <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
         <div className="flex items-center gap-3">
@@ -163,13 +404,18 @@ export const PathwayMap: React.FC<PathwayMapProps> = ({
             <figure className="space-y-1.5">
               <img
                 src={selectedPathway.imageUrl}
-                alt={`Hình minh họa môi trường học tập: ${selectedPathway.title}`}
+                alt={
+                  selectedPathway.imageCaption ??
+                  `Hình minh họa môi trường học tập: ${selectedPathway.title}`
+                }
                 className="w-full h-44 sm:h-56 object-cover rounded-xl border border-slate-200 dark:border-slate-800"
                 loading="lazy"
               />
-              <figcaption className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-                Hình minh họa môi trường học tập, không phải ảnh của một trường cụ thể.
-              </figcaption>
+              {selectedPathway.imageCaption && (
+                <figcaption className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                  {selectedPathway.imageCaption}
+                </figcaption>
+              )}
             </figure>
           )}
 
@@ -244,14 +490,17 @@ export const PathwayMap: React.FC<PathwayMapProps> = ({
                 {selectedPathway.learningContent}
               </p>
             </div>
-            <div className="space-y-1.5">
-              <p className="font-semibold text-slate-900 dark:text-white">
-                Cơ hội việc làm &amp; hướng đi tiếp
-              </p>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                {selectedPathway.careerOpportunities}
-              </p>
-            </div>
+            {(selectedPathway.category === "TRUNG_CAP" ||
+              selectedPathway.category === "SO_CAP") && (
+              <div className="space-y-1.5">
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  Cơ hội việc làm &amp; hướng đi tiếp
+                </p>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {selectedPathway.careerOpportunities}
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <p className="font-semibold text-slate-900 dark:text-white">
                 Cơ hội học tiếp / chuyển tiếp trình độ cao hơn
@@ -292,112 +541,6 @@ export const PathwayMap: React.FC<PathwayMapProps> = ({
             </div>
           </div>
 
-          {/* Người thật, việc thật */}
-          <div className="pt-2 space-y-3">
-            <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-              Người thật, việc thật (Chia sẻ của người làm nghề &amp; cựu học sinh)
-            </h4>
-            {selectedPathway.realStories.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 italic">
-                Nhà trường đang cập nhật thêm video hoặc bài chia sẻ cho lộ trình này.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedPathway.realStories.map((story) => {
-                  const thumb = getYouTubeThumbnailUrl(story.url);
-                  const hasThumb = Boolean(thumb) && !failedThumbIds[story.id];
-                  const questions =
-                    story.suggestedQuestions &&
-                    story.suggestedQuestions.length > 0
-                      ? story.suggestedQuestions
-                      : DEFAULT_PRACTITIONER_QUESTIONS;
-
-                  return (
-                    <div
-                      key={story.id}
-                      className="rounded-xl bg-[#EFCFE3]/25 dark:bg-[#EFCFE3]/10 border border-[#EA9AB2]/50 dark:border-slate-700 overflow-hidden flex flex-col justify-between"
-                    >
-                      {hasThumb && thumb ? (
-                        <a
-                          href={story.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block relative aspect-video bg-slate-900 overflow-hidden group"
-                        >
-                          <img
-                            src={thumb}
-                            alt={`Ảnh xem trước video: ${story.title}`}
-                            referrerPolicy="no-referrer"
-                            onError={() =>
-                              setFailedThumbIds((prev) => ({
-                                ...prev,
-                                [story.id]: true,
-                              }))
-                            }
-                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-3">
-                            <span className="text-xs font-semibold text-white inline-flex items-center gap-1.5">
-                              <PlayCircle className="w-4 h-4" />
-                              <span>Mở video YouTube trong tab mới</span>
-                            </span>
-                          </div>
-                        </a>
-                      ) : null}
-
-                      <div className="p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold flex items-center gap-1.5">
-                              <PlayCircle className="w-4 h-4 text-[#9D2950] dark:text-[#EA9AB2] shrink-0" />
-                              <span>{story.title}</span>
-                            </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-300">
-                              {story.personDesc}
-                            </p>
-                          </div>
-                          <a
-                            href={story.url}
-                            onClick={(e) => {
-                              if (story.url.startsWith("#")) e.preventDefault();
-                            }}
-                            target={
-                              story.url.startsWith("http")
-                                ? "_blank"
-                                : undefined
-                            }
-                            rel="noopener noreferrer"
-                            className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2] inline-flex items-center gap-1 shrink-0 hover:underline"
-                          >
-                            <span>
-                              {story.url.startsWith("http")
-                                ? "Mở tab mới"
-                                : "Xem minh họa"}
-                            </span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-
-                        <div className="p-3 rounded-lg bg-white/80 dark:bg-[#0F171E] border border-slate-200/70 dark:border-slate-800 space-y-1.5 text-xs">
-                          <p className="font-semibold text-[#133C42] dark:text-[#B3DEE2] flex items-center gap-1.5">
-                            <MessageSquareMore className="w-3.5 h-3.5" />
-                            <span>
-                              2 câu hỏi gợi ý khi em gặp người làm nghề:
-                            </span>
-                          </p>
-                          <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 leading-relaxed">
-                            {questions.slice(0, 2).map((q, idx) => (
-                              <li key={idx}>{q}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </section>
       )}
     </div>

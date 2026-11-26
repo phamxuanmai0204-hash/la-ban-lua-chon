@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Users,
   MessageSquareText,
@@ -12,25 +12,26 @@ import {
   Sun,
   Moon,
   Sparkles,
-  BookOpenText,
   AlertCircle,
-  FlaskConical,
   Settings,
   Columns3,
   Table2,
   RotateCcw,
   HeartHandshake,
+  FileText,
+  Search,
+  ClipboardCheck,
+  Clock3,
+  X,
+  UserPlus,
 } from "lucide-react";
 import { CompassLogo } from "../../components/CompassLogo";
 import { AccountMenu } from "../../components/AccountMenu";
-import { SelfProfile } from "../self-profile/SelfProfile";
 import { AIReviewQueue } from "./AIReviewQueue";
 import { RubricAssessment } from "./RubricAssessment";
 import { ThreePartyMeeting } from "./ThreePartyMeeting";
-import { ThematicCodingStudio } from "./ThematicCodingStudio";
-import { ContentAdmin } from "./ContentAdmin";
-import { ResearchMode } from "./ResearchMode";
 import { StudentTimeline } from "./StudentTimeline";
+import { StudentAccountsManager } from "./StudentAccountsManager";
 import { StudentSummaryReport } from "../student-journey/StudentSummaryReport";
 import { describeBehavioralSignals, JOURNEY_STEPS } from "../../data/mockData";
 import {
@@ -39,28 +40,79 @@ import {
   schoolClassLabel,
 } from "../../data/schoolClasses";
 import { requestTeacherJourneySummary } from "../../services/ai";
+import { fetchStudentRecords } from "../../services/studentRecords";
 import type {
   AIMessage,
   AIModerationAction,
   AIModerationLog,
   AppState,
+  AuthSession,
   AuthUser,
-  Experience,
   JourneyStep,
   Meeting,
-  Pathway,
   Student,
-  ThematicCodeItem,
 } from "../../types";
 
 type TeacherTab =
   | "class"
+  | "accounts"
   | "ai_queue"
   | "rubric"
   | "meetings"
-  | "thematic"
-  | "research"
-  | "admin";
+  | "summaries";
+
+const STEP_ACCENTS: Record<
+  JourneyStep,
+  { bar: string; soft: string; chip: string; text: string }
+> = {
+  THU: {
+    bar: "bg-[#B3DEE2]",
+    soft: "bg-[#B3DEE2]/25 dark:bg-[#B3DEE2]/10",
+    chip: "bg-[#B3DEE2]/70 text-[#133C42]",
+    text: "text-[#133C42] dark:text-[#B3DEE2]",
+  },
+  LỌC: {
+    bar: "bg-[#EAF2D7]",
+    soft: "bg-[#EAF2D7]/55 dark:bg-[#EAF2D7]/10",
+    chip: "bg-[#EAF2D7] text-[#223A1E]",
+    text: "text-[#223A1E] dark:text-[#EAF2D7]",
+  },
+  THỬ: {
+    bar: "bg-[#EFCFE3]",
+    soft: "bg-[#EFCFE3]/50 dark:bg-[#EFCFE3]/10",
+    chip: "bg-[#EFCFE3] text-[#4A1A2C]",
+    text: "text-[#4A1A2C] dark:text-[#EFCFE3]",
+  },
+  CHỐT: {
+    bar: "bg-[#EA9AB2]",
+    soft: "bg-[#EA9AB2]/25 dark:bg-[#EA9AB2]/10",
+    chip: "bg-[#EA9AB2]/45 text-[#4A1A2C]",
+    text: "text-[#9D2950] dark:text-[#EA9AB2]",
+  },
+  "CAM KẾT": {
+    bar: "bg-[#E27396]",
+    soft: "bg-[#E27396]/12 dark:bg-[#E27396]/10",
+    chip: "bg-[#E27396]/20 text-[#9D2950]",
+    text: "text-[#9D2950] dark:text-[#E27396]",
+  },
+};
+
+const AVATAR_ACCENTS = [
+  "bg-[#B3DEE2]/70 text-[#133C42]",
+  "bg-[#EAF2D7] text-[#223A1E]",
+  "bg-[#EFCFE3] text-[#4A1A2C]",
+  "bg-[#EA9AB2]/50 text-[#4A1A2C]",
+  "bg-[#E27396]/25 text-[#9D2950]",
+];
+
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (
+    parts[parts.length - 2][0] + parts[parts.length - 1][0]
+  ).toUpperCase();
+}
 
 interface TeacherDashboardProps {
   appState: AppState;
@@ -73,53 +125,42 @@ interface TeacherDashboardProps {
       reason?: string;
     }
   ) => void;
-  onUpdateThematicCodes: (next: ThematicCodeItem[]) => void;
   onToggleRequireApproval: () => void;
   onAddMeeting: (meeting: Meeting) => void;
   onUpdateMeeting: (meeting: Meeting) => void;
-  onUpdatePathway: (updated: Pathway) => void;
-  onAddPathway: (created: Pathway) => void;
-  onAddExperience: (activity: Experience) => void;
-  onDeleteExperience: (id: string) => void;
-  onImportContent: (payload: {
-    pathways: Pathway[];
-    experiences: Experience[];
-  }) => void;
   onOpenSettings: () => void;
   onToggleDarkMode: () => void;
   onExitRole: () => void;
   account?: AuthUser | null;
+  authSession?: AuthSession | null;
   offlineSession?: boolean;
   onLogout?: () => void;
+  onStudentAccountRenamed?: (accountId: string, fullName: string) => void;
+  onStudentAccountDeleted?: (accountId: string) => void;
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   appState,
   onUpdateStudent,
   onUpdateAIMessage,
-  onUpdateThematicCodes,
   onToggleRequireApproval,
   onAddMeeting,
   onUpdateMeeting,
-  onUpdatePathway,
-  onAddPathway,
-  onAddExperience,
-  onDeleteExperience,
-  onImportContent,
   onOpenSettings,
   onToggleDarkMode,
   onExitRole,
   account,
+  authSession,
   offlineSession,
   onLogout,
+  onStudentAccountRenamed,
+  onStudentAccountDeleted,
 }) => {
   const {
     students: allStudents,
-    pathways,
     experiences,
     aiMessages,
     aiModerationLogs,
-    thematicCodes,
     meetings,
     settings,
   } = appState;
@@ -127,10 +168,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [selectedClass, setSelectedClass] = useState<string>(
     account?.className ?? DEFAULT_CLASS_ID
   );
-  const students = useMemo(
-    () => allStudents.filter((s) => s.className === selectedClass),
-    [allStudents, selectedClass]
-  );
+
+  // Dữ liệu do thiết bị của từng học sinh gửi lên cho giáo viên chủ nhiệm CoThuy912.
+  const [remoteStudents, setRemoteStudents] = useState<Student[]>([]);
+  useEffect(() => {
+    if (!authSession || authSession.user.role !== "teacher") return;
+    if (offlineSession || authSession.token.startsWith("local-")) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    let active = true;
+    void fetchStudentRecords(authSession).then((records) => {
+      if (active) setRemoteStudents(records.map((record) => record.student));
+    });
+    return () => {
+      active = false;
+    };
+  }, [authSession, offlineSession]);
+
+  const students = useMemo(() => {
+    const byId = new Map(allStudents.map((s) => [s.id, s]));
+    for (const remote of remoteStudents) byId.set(remote.id, remote);
+    return Array.from(byId.values()).filter(
+      (s) => s.className === selectedClass
+    );
+  }, [allStudents, remoteStudents, selectedClass]);
 
   const [activeTab, setActiveTab] = useState<TeacherTab>("class");
   const [classViewMode, setClassViewMode] = useState<"board" | "table">(
@@ -138,6 +198,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   );
 
   // 3.1 Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [summaryFilter, setSummaryFilter] = useState<
+    "all" | "ready" | "pending"
+  >("all");
   const [onlyAttentionSignals, setOnlyAttentionSignals] = useState(false);
   const [onlyMissingDeadline, setOnlyMissingDeadline] = useState(false);
   const [onlyOverdueDeadline, setOnlyOverdueDeadline] = useState(false);
@@ -211,8 +275,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     }
   };
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredStudents = students.filter((s) => {
     const signals = describeBehavioralSignals(s.signals);
+    if (
+      normalizedQuery &&
+      !s.fullName.toLowerCase().includes(normalizedQuery)
+    )
+      return false;
     if (onlyAttentionSignals && signals.length === 0) return false;
     if (onlyMissingDeadline && Boolean(s.commitment.deadlineDate)) return false;
     if (onlyOverdueDeadline && !isStudentOverdue(s)) return false;
@@ -278,6 +348,25 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const pendingAICount = aiMessages.filter((m) => m.status === "chờ duyệt").length;
   const sensitiveCount = aiMessages.filter((m) => m.nhayCam).length;
   const hasVisualPreviewMoves = Object.keys(visualPreviewSteps).length > 0;
+  const summaryStudents = students.filter((s) => Boolean(s.summary));
+  const committedCount = students.filter((s) =>
+    Boolean(s.commitment.studentConfirmedAt)
+  ).length;
+  const overdueCount = students.filter(isStudentOverdue).length;
+  const attentionCount = students.filter(
+    (s) => describeBehavioralSignals(s.signals).length > 0
+  ).length;
+  const summarySearchStudents = students
+    .filter((s) =>
+      summaryFilter === "all"
+        ? true
+        : summaryFilter === "ready"
+        ? Boolean(s.summary)
+        : !s.summary
+    )
+    .filter(
+      (s) => !normalizedQuery || s.fullName.toLowerCase().includes(normalizedQuery)
+    );
 
   const handleTeacherConfirmCommitment = (stu: Student) => {
     const now = new Date().toLocaleString("vi-VN", {
@@ -314,9 +403,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </span>
           </button>
 
-          <nav className="hidden md:flex items-center gap-4 text-xs lg:text-sm font-medium text-slate-600 dark:text-slate-300">
+          <nav className="hidden md:flex items-center gap-1 p-1 rounded-full border border-slate-200/80 dark:border-slate-700 bg-[#F6F8FA] dark:bg-[#0F171E]">
             {[
               { id: "class", label: schoolClassLabel(selectedClass) },
+              { id: "accounts", label: "Tài khoản học sinh" },
               {
                 id: "ai_queue",
                 label:
@@ -326,26 +416,28 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               },
               { id: "rubric", label: "Đánh giá 4 mức" },
               { id: "meetings", label: "Họp ba bên" },
-              { id: "thematic", label: "Mã hóa" },
-              { id: "research", label: "Nghiên cứu" },
-              { id: "admin", label: "Quản trị" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setOpenedStudentId(null);
-                  setActiveTab(item.id as TeacherTab);
-                }}
-                className={`whitespace-nowrap shrink-0 py-1 border-b-2 transition-colors cursor-pointer ${
-                  activeTab === item.id && !openedStudent
-                    ? "border-[#E27396] text-[#1D242B] dark:text-white font-semibold"
-                    : "border-transparent hover:text-[#1D242B] dark:hover:text-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+              { id: "summaries", label: "Hồ sơ tổng hợp" },
+            ].map((item) => {
+              const active = activeTab === item.id && !openedStudent;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    setOpenedStudentId(null);
+                    setActiveTab(item.id as TeacherTab);
+                  }}
+                  className={`whitespace-nowrap shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    active
+                      ? "bg-[#E27396] text-[#2B111A] shadow-sm"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-[#EFCFE3]/60 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -368,12 +460,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
       </header>
 
-      <div className="border-b border-slate-200/70 dark:border-slate-800 bg-[#EAF2D7]/40 dark:bg-[#17222C]/60">
+      <div className="border-b border-slate-200/70 dark:border-slate-800 bg-gradient-to-r from-[#EAF2D7]/60 via-white to-[#B3DEE2]/35 dark:from-[#17222C] dark:via-[#17222C] dark:to-[#17222C]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
           <div className="flex flex-wrap items-center gap-2 text-slate-700 dark:text-slate-200">
             <label
               htmlFor="teacher-class-select"
-              className="text-xs font-semibold sr-only sm:not-sr-only"
+              className="text-xs font-semibold sr-only sm:not-sr-only text-slate-600 dark:text-slate-300"
             >
               Chọn lớp nhanh
             </label>
@@ -384,8 +476,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 setSelectedClass(e.target.value);
                 setOpenedStudentId(null);
                 setStepFilter("ALL");
+                setSearchQuery("");
               }}
-              className="min-h-[34px] rounded-lg border border-[#223A1E]/30 dark:border-slate-700 bg-white dark:bg-[#0F171E] px-2 py-1 text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7] focus:outline-none focus:ring-2 focus:ring-[#E27396]"
+              className="min-h-[34px] rounded-full border border-[#223A1E]/20 dark:border-slate-700 bg-white dark:bg-[#0F171E] pl-3 pr-8 py-1 text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7] focus:outline-none focus:ring-2 focus:ring-[#E27396] cursor-pointer"
             >
               {SCHOOL_CLASSES.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -393,25 +486,22 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </option>
               ))}
             </select>
-            <span aria-hidden="true">·</span>
-            <span>
-              {allStudents.length} học sinh toàn khối · {students.length} em
-              trong lớp này
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 dark:bg-[#0F171E] border border-slate-200 dark:border-slate-700 px-3 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+              <Users className="w-3.5 h-3.5 text-[#133C42] dark:text-[#B3DEE2]" />
+              {allStudents.length} học sinh toàn khối · {students.length} em lớp này
             </span>
             {sensitiveCount > 0 && (
-              <>
-                <span aria-hidden="true">·</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenedStudentId(null);
-                    setActiveTab("ai_queue");
-                  }}
-                  className="text-rose-700 dark:text-rose-300 font-bold hover:underline cursor-pointer"
-                >
-                  Có cảnh báo nhạy cảm cần xem ({sensitiveCount})
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenedStudentId(null);
+                  setActiveTab("ai_queue");
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#E27396]/15 border border-[#E27396]/60 px-3 py-1 text-[11px] font-bold text-[#9D2950] hover:bg-[#E27396]/25 transition-colors cursor-pointer"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Cảnh báo nhạy cảm cần xem ({sensitiveCount})
+              </button>
             )}
           </div>
 
@@ -419,7 +509,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="min-h-[38px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[34px] px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-[#17222C] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#EA9AB2] transition-colors cursor-pointer"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Cài đặt</span>
@@ -428,7 +518,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <button
               type="button"
               onClick={onToggleDarkMode}
-              className="min-h-[38px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[34px] px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-[#17222C] text-xs font-medium inline-flex items-center gap-1.5 hover:border-[#EA9AB2] transition-colors cursor-pointer"
             >
               {settings.darkMode ? (
                 <Sun className="w-3.5 h-3.5" />
@@ -442,15 +532,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       </div>
 
       {/* Mobile Nav */}
-      <div className="md:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C] px-4 py-2 flex overflow-x-auto gap-2">
+      <div className="md:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C] px-4 py-2 flex overflow-x-auto gap-1.5">
         {[
           { id: "class", label: schoolClassLabel(selectedClass), icon: Users },
+          {
+            id: "accounts",
+            label: "Tài khoản học sinh",
+            icon: UserPlus,
+          },
           { id: "ai_queue", label: "Duyệt AI", icon: MessageSquareText },
           { id: "rubric", label: "Đánh giá", icon: BarChart2 },
           { id: "meetings", label: "Họp 3 bên", icon: Calendar },
-          { id: "thematic", label: "Mã hóa", icon: BookOpenText },
-          { id: "research", label: "Nghiên cứu", icon: FlaskConical },
-          { id: "admin", label: "Quản trị", icon: Settings2 },
+          { id: "summaries", label: "Hồ sơ tổng hợp", icon: FileText },
         ].map((item) => {
           const Icon = item.icon;
           const active = activeTab === item.id;
@@ -462,10 +555,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 setOpenedStudentId(null);
                 setActiveTab(item.id as TeacherTab);
               }}
-              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              className={`min-h-[36px] px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer ${
                 active
-                  ? "bg-[#B3DEE2] text-[#133C42]"
-                  : "bg-slate-100 dark:bg-[#0F171E] text-slate-700 dark:text-slate-300"
+                  ? "bg-[#E27396] text-[#2B111A] shadow-sm"
+                  : "bg-[#F1F4F8] dark:bg-[#0F171E] text-slate-700 dark:text-slate-300"
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -482,7 +575,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setOpenedStudentId(null)}
-                className="min-h-[42px] px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] text-sm font-semibold inline-flex items-center gap-2 cursor-pointer"
+                className="min-h-[40px] px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#17222C] text-sm font-semibold inline-flex items-center gap-2 hover:border-[#EA9AB2] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Quay lại danh sách {schoolClassLabel(selectedClass)}</span>
@@ -496,34 +589,74 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     setOpenedStudentId(null);
                     setActiveTab("rubric");
                   }}
-                  className="min-h-[42px] px-4 py-2 rounded-xl bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42] text-xs sm:text-sm font-semibold cursor-pointer"
+                  className="min-h-[40px] px-4 py-2 rounded-full bg-[#B3DEE2]/70 hover:bg-[#B3DEE2] text-[#133C42] text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Đánh giá 4 mức &amp; Minh chứng cho em này
                 </button>
               </div>
             </div>
 
-            <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <span className="text-lg font-bold text-[#1D242B] dark:text-white">
-                  Hồ sơ {openedStudent.fullName}
-                </span>
-                <span aria-hidden="true">·</span>
-                <span>Bước {openedStudent.currentStep}</span>
-                <span aria-hidden="true">·</span>
-                <span>
-                  Chia sẻ với phụ huynh:{" "}
-                  {openedStudent.shareWithParent ? "Đang bật" : "Đang tắt"}
-                </span>
+            <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+              <div className="p-5 sm:p-6 flex flex-wrap items-center gap-4 bg-gradient-to-r from-[#EFCFE3]/55 via-white to-[#B3DEE2]/45 dark:from-[#17222C] dark:via-[#17222C] dark:to-[#17222C] border-b border-slate-200/70 dark:border-slate-800">
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold shrink-0 ${
+                    AVATAR_ACCENTS[
+                      Math.max(
+                        0,
+                        students.findIndex((s) => s.id === openedStudent.id)
+                      ) % AVATAR_ACCENTS.length
+                    ]
+                  }`}
+                  aria-hidden="true"
+                >
+                  {initialsOf(openedStudent.fullName)}
+                </div>
+                <div className="min-w-0 space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9D2950] dark:text-[#EA9AB2]">
+                    Hồ sơ học sinh
+                  </p>
+                  <h1 className="text-xl sm:text-2xl font-bold leading-tight">
+                    {openedStudent.fullName}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/80 dark:bg-[#0F171E] border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-slate-600 dark:text-slate-300">
+                      Lớp {openedStudent.className}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${
+                        STEP_ACCENTS[openedStudent.currentStep].chip
+                      }`}
+                    >
+                      Bước {openedStudent.currentStep}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${
+                        openedStudent.shareWithParent
+                          ? "bg-[#EAF2D7] text-[#223A1E]"
+                          : "bg-slate-100 text-slate-600 dark:bg-[#0F171E] dark:text-slate-300"
+                      }`}
+                    >
+                      Chia sẻ với phụ huynh:{" "}
+                      {openedStudent.shareWithParent ? "bật" : "tắt"}
+                    </span>
+                    {openedStudent.summary && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#E27396]/18 text-[#9D2950] dark:bg-[#E27396]/20 dark:text-[#EA9AB2] px-2.5 py-1">
+                        <FileText className="w-3 h-3" />
+                        Đã có hồ sơ tổng hợp
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
+              <div className="p-5 sm:p-6 space-y-4">
               {openedStudent.dataDeletionRequestedAt && (
                 <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-700 text-xs sm:text-sm text-rose-900 dark:text-rose-100">
                   <strong>Yêu cầu xóa dữ liệu cá nhân:</strong> {openedStudent.fullName} đã gửi yêu cầu xóa dữ liệu vào lúc{" "}
                   <span className="tabular-nums font-semibold">
                     {openedStudent.dataDeletionRequestedAt}
                   </span>
-                  . Thầy/cô vui lòng xử lí theo quy trình đạo đức nghiên cứu.
+                  . Thầy/cô vui lòng xử lí theo quy trình bảo vệ dữ liệu học sinh.
                 </div>
               )}
 
@@ -613,6 +746,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   </div>
                 )}
               </div>
+              </div>
             </section>
 
             {openedStudent.summary && (
@@ -630,74 +764,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               meetings={meetings}
             />
 
-            <SelfProfile
-              student={openedStudent}
-              isTeacherEditing={true}
-              onUpdateStudent={onUpdateStudent}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
-                <h3 className="text-base font-bold">
-                  Tiêu chí &amp; Phương án em đang cân nhắc
-                </h3>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                    Tiêu chí tối thiểu em đặt:
-                  </p>
-                  {openedStudent.criteria.length === 0 ? (
-                    <p className="text-sm text-slate-500">Chưa đặt tiêu chí.</p>
-                  ) : (
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {openedStudent.criteria.map((c) => (
-                        <li key={c.id}>{c.label}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                    Phương án đang xét / tạm gác:
-                  </p>
-                  <ul className="space-y-1.5 text-sm">
-                    {openedStudent.consideredOptions.map((o) => (
-                      <li
-                        key={o.id}
-                        className="p-2.5 rounded-lg bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200/70 dark:border-slate-800 flex items-center justify-between"
-                      >
-                        <span>{o.title}</span>
-                        <span className="text-xs text-slate-500">{o.status}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                    Nhật ký lựa chọn ({openedStudent.journal.length})
-                  </p>
-                  {openedStudent.journal.length === 0 ? (
-                    <p className="text-sm text-slate-500">Chưa có ghi chép nhật ký.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {openedStudent.journal.map((j) => (
-                        <div
-                          key={j.id}
-                          className="p-3 rounded-lg bg-[#FAFBFD] dark:bg-[#0F171E] text-sm space-y-1"
-                        >
-                          <p className="text-xs text-slate-500">
-                            {j.activityType} · {j.date}
-                          </p>
-                          <p>{j.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
+            <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
                 <h3 className="text-base font-bold">
                   Phiếu cam kết điện tử của {openedStudent.fullName}
                 </h3>
@@ -750,50 +817,152 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       : "Xác nhận phiếu cam kết (GVCN)"}
                   </span>
                 </button>
-              </section>
-            </div>
+            </section>
           </div>
         ) : (
           <>
             {activeTab === "class" && (
               <div className="space-y-6">
+                <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                  <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#17222C] p-4">
+                    <span className="w-9 h-9 rounded-xl bg-[#B3DEE2]/45 text-[#133C42] dark:text-[#B3DEE2] flex items-center justify-center">
+                      <Users className="w-4.5 h-4.5" />
+                    </span>
+                    <p className="mt-3 text-2xl font-bold tabular-nums leading-none">
+                      {students.length}
+                    </p>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Học sinh trong lớp
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {allStudents.length} em toàn khối
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#17222C] p-4">
+                    <span className="w-9 h-9 rounded-xl bg-[#EAF2D7] text-[#223A1E] flex items-center justify-center">
+                      <ClipboardCheck className="w-4.5 h-4.5" />
+                    </span>
+                    <p className="mt-3 text-2xl font-bold tabular-nums leading-none">
+                      {committedCount}
+                    </p>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Đã kí phiếu cam kết
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {students.length - committedCount} em còn lại
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenedStudentId(null);
+                      setActiveTab("summaries");
+                    }}
+                    className="text-left rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#17222C] p-4 hover:border-[#EA9AB2] hover:shadow-sm transition-all cursor-pointer"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-[#EFCFE3]/80 text-[#4A1A2C] flex items-center justify-center">
+                      <FileText className="w-4.5 h-4.5" />
+                    </span>
+                    <p className="mt-3 text-2xl font-bold tabular-nums leading-none">
+                      {summaryStudents.length}
+                      <span className="text-sm font-semibold text-slate-400">
+                        /{students.length}
+                      </span>
+                    </p>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Hồ sơ tổng hợp
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      AI biên soạn sau 5 bước
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenedStudentId(null);
+                      setActiveTab("ai_queue");
+                    }}
+                    className="text-left rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#17222C] p-4 hover:border-[#EA9AB2] hover:shadow-sm transition-all cursor-pointer"
+                  >
+                    <span className="w-9 h-9 rounded-xl bg-[#EA9AB2]/40 text-[#4A1A2C] flex items-center justify-center">
+                      <MessageSquareText className="w-4.5 h-4.5" />
+                    </span>
+                    <p className="mt-3 text-2xl font-bold tabular-nums leading-none">
+                      {pendingAICount}
+                    </p>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Phản hồi AI chờ duyệt
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {pendingAIStudentIds.size} học sinh liên quan
+                    </p>
+                  </button>
+
+                  <div className="rounded-2xl border border-[#E27396]/40 bg-[#E27396]/10 dark:bg-[#E27396]/10 p-4">
+                    <span className="w-9 h-9 rounded-xl bg-[#E27396]/25 text-[#9D2950] dark:text-[#EA9AB2] flex items-center justify-center">
+                      <AlertTriangle className="w-4.5 h-4.5" />
+                    </span>
+                    <p className="mt-3 text-2xl font-bold tabular-nums leading-none text-[#9D2950] dark:text-[#EA9AB2]">
+                      {attentionCount}
+                    </p>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Cần thầy/cô chú ý
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {overdueCount} em quá hạn chốt
+                    </p>
+                  </div>
+                </section>
+
                 {/* 3.1: Cần thầy/cô quan tâm hôm nay (tối đa 5 HS) */}
                 {attentionTodayList.length > 0 && (
-                  <section className="bg-white dark:bg-[#17222C] border border-[#EA9AB2]/70 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-3">
-                    <div className="flex items-center gap-2.5">
-                      <HeartHandshake className="w-5 h-5 text-[#9D2950] dark:text-[#EA9AB2]" />
+                  <section className="bg-white dark:bg-[#17222C] border border-[#EA9AB2]/60 dark:border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-[#EFCFE3]/70 via-[#EFCFE3]/25 to-transparent dark:from-[#E27396]/15 dark:via-transparent dark:to-transparent border-b border-[#EA9AB2]/40 dark:border-slate-800 flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-xl bg-white/80 dark:bg-[#0F171E] text-[#9D2950] dark:text-[#EA9AB2] flex items-center justify-center shrink-0">
+                        <HeartHandshake className="w-4.5 h-4.5" />
+                      </span>
                       <div>
-                        <h2 className="text-base sm:text-lg font-bold">
-                          Cần thầy/cô quan tâm hôm nay ({attentionTodayList.length} học sinh)
+                        <h2 className="text-sm sm:text-base font-bold">
+                          Cần thầy/cô quan tâm hôm nay
+                          <span className="ml-2 inline-flex items-center rounded-full bg-[#E27396] text-[#2B111A] text-[11px] font-bold px-2 py-0.5 align-middle">
+                            {attentionTodayList.length} học sinh
+                          </span>
                         </h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                           Tối đa 5 gợi ý ưu tiên theo dấu hiệu nhạy cảm, AI chờ duyệt hoặc tiến độ chốt lựa chọn.
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                       {attentionTodayList.map((item) => (
                         <button
                           key={item.student.id}
                           type="button"
                           onClick={() => setOpenedStudentId(item.student.id)}
-                          className="text-left p-3.5 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 hover:border-[#E27396] transition-colors flex flex-col justify-between gap-2 cursor-pointer"
+                          className="group text-left p-3.5 rounded-xl bg-white dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 hover:border-[#E27396] hover:shadow-sm transition-all flex flex-col justify-between gap-2.5 cursor-pointer"
                         >
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-bold text-[#1D242B] dark:text-white">
+                          <div className="space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-bold text-[#1D242B] dark:text-white leading-snug">
                                 {item.student.fullName}
                               </span>
-                              <span className="text-[11px] font-semibold text-[#133C42] dark:text-[#B3DEE2]">
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  STEP_ACCENTS[item.student.currentStep].chip
+                                }`}
+                              >
                                 {item.student.currentStep}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
                               {item.reason}
                             </p>
                           </div>
-                          <span className="text-[11px] font-semibold text-[#9D2950] dark:text-[#EA9AB2]">
+                          <span className="text-[11px] font-semibold text-[#9D2950] dark:text-[#EA9AB2] group-hover:underline">
                             Mở hồ sơ →
                           </span>
                         </button>
@@ -806,22 +975,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div>
-                      <h1 className="text-lg sm:text-xl font-bold">
-                        Tổng quan {schoolClassLabel(selectedClass)} ({students.length} học sinh)
+                      <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2.5">
+                        <span
+                          aria-hidden="true"
+                          className="h-6 w-1.5 rounded-full bg-gradient-to-b from-[#E27396] to-[#EA9AB2]"
+                        />
+                        <span>
+                          Tổng quan {schoolClassLabel(selectedClass)}
+                          <span className="ml-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                            {students.length} học sinh
+                          </span>
+                        </span>
                       </h1>
-                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5">
-                        Đang hiển thị {filteredStudents.length} học sinh theo bộ lọc. Kéo thẻ trên bản đồ chỉ để thầy/cô xem thử, không làm đổi dữ liệu học sinh.
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
+                        Đang hiển thị {filteredStudents.length} học sinh theo bộ
+                        lọc. Kéo thẻ trên bản đồ chỉ để thầy/cô xem thử, không
+                        làm đổi dữ liệu học sinh.
                       </p>
                     </div>
 
-                    <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-[#0F171E] self-start">
+                    <div className="inline-flex p-1 rounded-full bg-[#F1F4F8] dark:bg-[#0F171E] border border-slate-200/70 dark:border-slate-700 self-start">
                       <button
                         type="button"
                         onClick={() => setClassViewMode("board")}
-                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer ${
+                        className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                           classViewMode === "board"
-                            ? "bg-white dark:bg-[#17222C] text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-600 dark:text-slate-400"
+                            ? "bg-[#B3DEE2] text-[#133C42] shadow-sm"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
                         }`}
                       >
                         <Columns3 className="w-3.5 h-3.5" />
@@ -830,10 +1010,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       <button
                         type="button"
                         onClick={() => setClassViewMode("table")}
-                        className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer ${
+                        className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                           classViewMode === "table"
-                            ? "bg-white dark:bg-[#17222C] text-slate-900 dark:text-white shadow-sm"
-                            : "text-slate-600 dark:text-slate-400"
+                            ? "bg-[#B3DEE2] text-[#133C42] shadow-sm"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
                         }`}
                       >
                         <Table2 className="w-3.5 h-3.5" />
@@ -842,68 +1022,96 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Bộ lọc trạng thái */}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOnlyAttentionSignals(!onlyAttentionSignals)
-                      }
-                      className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        onlyAttentionSignals
-                          ? "bg-[#B3DEE2] border-[#63AEB6] text-[#133C42]"
-                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-300 dark:border-slate-700"
-                      }`}
-                    >
-                      Có dấu hiệu cần chú ý
-                    </button>
+                  {/* Tìm kiếm + bộ lọc trạng thái */}
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                    <div className="relative w-full xl:max-w-xs">
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Tìm học sinh theo họ tên..."
+                        aria-label="Tìm học sinh theo họ tên"
+                        className="w-full min-h-[38px] rounded-full border border-slate-200 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] pl-10 pr-9 py-1.5 text-xs font-medium text-[#1D242B] dark:text-[#EDF2F7] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E27396] focus:border-transparent"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Xóa từ khóa tìm kiếm"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-6 h-6 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setOnlyMissingDeadline(!onlyMissingDeadline)}
-                      className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        onlyMissingDeadline
-                          ? "bg-[#B3DEE2] border-[#63AEB6] text-[#133C42]"
-                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-300 dark:border-slate-700"
-                      }`}
-                    >
-                      Chưa đặt hạn chốt
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setOnlyOverdueDeadline(!onlyOverdueDeadline)}
-                      className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        onlyOverdueDeadline
-                          ? "bg-[#EFCFE3]/70 border-[#E27396] text-[#4A1A2C]"
-                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-300 dark:border-slate-700"
-                      }`}
-                    >
-                      Quá hạn chốt
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setOnlyPendingAI(!onlyPendingAI)}
-                      className={`min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
-                        onlyPendingAI
-                          ? "bg-[#EAF2D7] border-[#8FB37C] text-[#223A1E]"
-                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-300 dark:border-slate-700"
-                      }`}
-                    >
-                      Có phản hồi AI chờ duyệt ({pendingAIStudentIds.size})
-                    </button>
-                  </div>
-
-                  {classViewMode === "table" && (
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
+                        onClick={() =>
+                          setOnlyAttentionSignals(!onlyAttentionSignals)
+                        }
+                        className={`min-h-[34px] px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors cursor-pointer ${
+                          onlyAttentionSignals
+                            ? "bg-[#EFCFE3] border-[#EA9AB2] text-[#4A1A2C]"
+                            : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                        }`}
+                      >
+                        Có dấu hiệu cần chú ý ({attentionCount})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOnlyMissingDeadline(!onlyMissingDeadline)
+                        }
+                        className={`min-h-[34px] px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors cursor-pointer ${
+                          onlyMissingDeadline
+                            ? "bg-[#B3DEE2]/70 border-[#63AEB6] text-[#133C42]"
+                            : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                        }`}
+                      >
+                        Chưa đặt hạn chốt
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOnlyOverdueDeadline(!onlyOverdueDeadline)
+                        }
+                        className={`min-h-[34px] px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors cursor-pointer ${
+                          onlyOverdueDeadline
+                            ? "bg-[#E27396]/20 border-[#E27396] text-[#9D2950]"
+                            : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                        }`}
+                      >
+                        Quá hạn chốt ({overdueCount})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOnlyPendingAI(!onlyPendingAI)}
+                        className={`min-h-[34px] px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors cursor-pointer ${
+                          onlyPendingAI
+                            ? "bg-[#EAF2D7] border-[#8FB37C] text-[#223A1E]"
+                            : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                        }`}
+                      >
+                        AI chờ duyệt ({pendingAIStudentIds.size})
+                      </button>
+                    </div>
+                  </div>
+
+                  {classViewMode === "table" && (
+                    <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800 mt-1">
+                      <button
+                        type="button"
                         onClick={() => setStepFilter("ALL")}
-                        className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                        className={`min-h-[32px] px-3 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                           stepFilter === "ALL"
-                            ? "bg-[#1D242B] text-white dark:bg-[#B3DEE2] dark:text-[#133C42]"
-                            : "bg-slate-100 dark:bg-[#0F171E] text-slate-700 dark:text-slate-300"
+                            ? "bg-[#E27396] text-[#2B111A] shadow-sm"
+                            : "bg-[#F1F4F8] dark:bg-[#0F171E] text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white"
                         }`}
                       >
                         Tất cả bước ({students.length})
@@ -913,10 +1121,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           key={st.id}
                           type="button"
                           onClick={() => setStepFilter(st.id)}
-                          className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                          className={`min-h-[32px] px-3 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
                             stepFilter === st.id
-                              ? "bg-[#1D242B] text-white dark:bg-[#B3DEE2] dark:text-[#133C42]"
-                              : "bg-slate-100 dark:bg-[#0F171E] text-slate-700 dark:text-slate-300"
+                              ? "bg-[#E27396] text-[#2B111A] shadow-sm"
+                              : "bg-[#F1F4F8] dark:bg-[#0F171E] text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white"
                           }`}
                         >
                           {st.label} (
@@ -946,14 +1154,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     )}
 
                     {/* 5-Column Journey Map (THU - LỌC - THỬ - CHỐT - CAM KẾT) */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                      {JOURNEY_STEPS.map((col) => {
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                      {JOURNEY_STEPS.map((col, colIndex) => {
                         const colStudents = filteredStudents.filter((s) => {
                           const displayStep =
                             visualPreviewSteps[s.id] || s.currentStep;
                           return displayStep === col.id;
                         });
                         const isDropTarget = dragOverColumn === col.id;
+                        const accent = STEP_ACCENTS[col.id];
+                        const avatarTint =
+                          AVATAR_ACCENTS[colIndex % AVATAR_ACCENTS.length];
 
                         return (
                           <div
@@ -977,29 +1188,39 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                               setDragOverColumn(null);
                               setDraggedStudentId(null);
                             }}
-                            className={`rounded-2xl border p-3.5 flex flex-col gap-3 min-h-[340px] transition-colors ${
+                            className={`rounded-2xl border overflow-hidden flex flex-col min-h-[340px] transition-all ${
                               isDropTarget
-                                ? "border-[#E27396] bg-[#EFCFE3]/20 dark:bg-[#E27396]/10"
+                                ? "border-[#E27396] ring-2 ring-[#E27396]/25 bg-[#EFCFE3]/20 dark:bg-[#E27396]/10"
                                 : "border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C]"
                             }`}
                           >
-                            <div className="border-b border-slate-200/80 dark:border-slate-800 pb-2.5 flex items-center justify-between gap-2">
-                              <div>
-                                <h3 className="text-sm font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                                  {col.label}
-                                </h3>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  {col.shortDesc}
-                                </p>
+                            <div
+                              className={`px-3.5 py-3 border-b border-slate-200/70 dark:border-slate-800 ${accent.soft}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${accent.bar}`}
+                                  />
+                                  <h3 className="text-sm font-bold truncate">
+                                    {col.label}
+                                  </h3>
+                                </div>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${accent.chip}`}
+                                >
+                                  {colStudents.length}
+                                </span>
                               </div>
-                              <span className="px-2.5 py-1 rounded-lg bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-700 text-xs font-bold tabular-nums shrink-0">
-                                {colStudents.length} HS
-                              </span>
+                              <p className="mt-1 pl-4.5 text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                                {col.shortDesc}
+                              </p>
                             </div>
 
-                            <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                            <div className="p-2.5 space-y-2 flex-1 max-h-[500px] overflow-y-auto">
                               {colStudents.length === 0 ? (
-                                <p className="text-xs text-slate-400 text-center py-6">
+                                <p className="text-[11px] text-slate-400 text-center py-6 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                                   Không có học sinh nào ở bước này
                                 </p>
                               ) : (
@@ -1041,44 +1262,63 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                           setOpenedStudentId(stu.id);
                                         }
                                       }}
-                                      className={`p-2.5 rounded-xl border text-left transition-colors cursor-grab active:cursor-grabbing hover:border-[#3A8F98] ${
+                                      className={`p-2.5 rounded-xl border text-left transition-all cursor-grab active:cursor-grabbing hover:shadow-sm ${
                                         stu.signals.hasSensitiveAlert
-                                          ? "bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-700"
+                                          ? "bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-700 hover:border-rose-400"
                                           : isMovedPreview
-                                          ? "bg-[#EAF2D7]/50 dark:bg-[#EAF2D7]/10 border-[#8FB37C]"
-                                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-800"
+                                          ? "bg-[#EAF2D7]/55 dark:bg-[#EAF2D7]/10 border-[#8FB37C] hover:border-[#8FB37C]"
+                                          : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200/90 dark:border-slate-800 hover:border-[#EA9AB2]"
                                       }`}
                                     >
-                                      <div className="flex items-center justify-between gap-1.5">
-                                        <span className="text-xs font-bold">
-                                          {stu.fullName}
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          aria-hidden="true"
+                                          className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarTint}`}
+                                        >
+                                          {initialsOf(stu.fullName)}
                                         </span>
-                                        <span className="text-[11px] text-slate-500">
-                                          {stu.currentStep}
-                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-xs font-bold truncate">
+                                            {stu.fullName}
+                                          </p>
+                                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                            Lớp {stu.className}
+                                          </p>
+                                        </div>
                                       </div>
-                                      <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-                                        {pendingAI && (
-                                          <span className="text-[#133C42] dark:text-[#B3DEE2] font-semibold">
-                                            · AI chờ duyệt
-                                          </span>
-                                        )}
-                                        {overdue && (
-                                          <span className="text-[#9D2950] dark:text-[#EA9AB2] font-semibold">
-                                            · Quá hạn chốt
-                                          </span>
-                                        )}
-                                        {stu.dataDeletionRequestedAt && (
-                                          <span className="text-rose-700 dark:text-rose-300 font-semibold">
-                                            · Yêu cầu xóa dữ liệu
-                                          </span>
-                                        )}
-                                        {hasSig && !overdue && (
-                                          <span className="text-slate-600 dark:text-slate-300">
-                                            · Cần chú ý
-                                          </span>
-                                        )}
-                                      </div>
+                                      {(stu.summary ||
+                                        pendingAI ||
+                                        overdue ||
+                                        stu.dataDeletionRequestedAt ||
+                                        hasSig) && (
+                                        <div className="mt-1.5 flex flex-wrap gap-1">
+                                          {stu.summary && (
+                                            <span className="rounded-full bg-[#B3DEE2]/65 text-[#133C42] px-1.5 py-0.5 text-[10px] font-semibold">
+                                              Hồ sơ tổng hợp
+                                            </span>
+                                          )}
+                                          {pendingAI && (
+                                            <span className="rounded-full bg-[#EA9AB2]/40 text-[#4A1A2C] px-1.5 py-0.5 text-[10px] font-semibold">
+                                              AI chờ duyệt
+                                            </span>
+                                          )}
+                                          {overdue && (
+                                            <span className="rounded-full bg-[#E27396]/20 text-[#9D2950] px-1.5 py-0.5 text-[10px] font-semibold">
+                                              Quá hạn chốt
+                                            </span>
+                                          )}
+                                          {stu.dataDeletionRequestedAt && (
+                                            <span className="rounded-full bg-rose-100 text-rose-800 px-1.5 py-0.5 text-[10px] font-semibold">
+                                              Yêu cầu xóa dữ liệu
+                                            </span>
+                                          )}
+                                          {hasSig && !overdue && (
+                                            <span className="rounded-full bg-[#EFCFE3]/70 text-[#4A1A2C] px-1.5 py-0.5 text-[10px] font-semibold">
+                                              Cần chú ý
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })
@@ -1091,109 +1331,182 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   </div>
                 ) : (
                   <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200 dark:border-slate-800 bg-[#FAFBFD] dark:bg-[#0F171E] text-xs text-slate-500 dark:text-slate-400">
-                            <th className="py-3.5 px-4 font-semibold">Học sinh</th>
-                            <th className="py-3.5 px-4 font-semibold">Bước hiện tại</th>
-                            <th className="py-3.5 px-4 font-semibold">Hạn chốt &amp; Trạng thái</th>
-                            <th className="py-3.5 px-4 font-semibold">Dấu hiệu cần chú ý</th>
-                            <th className="py-3.5 px-4 font-semibold text-right">Hành động</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                          {filteredStudents.map((stu) => {
-                            const signals = describeBehavioralSignals(stu.signals);
-                            const isCommitted = Boolean(
-                              stu.commitment.studentConfirmedAt
-                            );
-                            const overdue = isStudentOverdue(stu);
-                            return (
-                              <tr
-                                key={stu.id}
-                                className="hover:bg-[#FAFBFD] dark:hover:bg-[#0F171E]/60 transition-colors"
-                              >
-                                <td className="py-3.5 px-4 align-top">
-                                  <div className="font-bold">
-                                    {stu.fullName}
-                                  </div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Lớp {stu.className}
-                                  </div>
-                                </td>
-
-                                <td className="py-3.5 px-4 align-top font-semibold">
-                                  {stu.currentStep}
-                                </td>
-
-                                <td className="py-3.5 px-4 align-top">
-                                  {isCommitted ? (
-                                    <div>
-                                      <p className="font-medium text-[#223A1E] dark:text-[#EAF2D7]">
-                                        Đã chốt
-                                      </p>
-                                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 max-w-xs">
-                                        {stu.commitment.chosenOption}
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-0.5">
+                    {filteredStudents.length === 0 ? (
+                      <div className="p-10 text-center space-y-2">
+                        <Search className="w-8 h-8 mx-auto text-[#EA9AB2]" />
+                        <p className="text-sm font-bold">
+                          Không tìm thấy học sinh phù hợp
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Thầy/cô thử xóa từ khóa tìm kiếm hoặc bỏ bớt bộ lọc
+                          trạng thái.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setOnlyAttentionSignals(false);
+                            setOnlyMissingDeadline(false);
+                            setOnlyOverdueDeadline(false);
+                            setOnlyPendingAI(false);
+                            setStepFilter("ALL");
+                          }}
+                          className="mt-1 min-h-[34px] px-4 py-1.5 rounded-full bg-[#E27396] hover:bg-[#EA9AB2] text-[#2B111A] text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Xóa tất cả bộ lọc
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-[#F6F8FA] dark:bg-[#0F171E] text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              <th className="py-3 px-4 font-semibold">Học sinh</th>
+                              <th className="py-3 px-4 font-semibold">Bước</th>
+                              <th className="py-3 px-4 font-semibold">
+                                Hạn chốt &amp; trạng thái
+                              </th>
+                              <th className="py-3 px-4 font-semibold">Dấu hiệu</th>
+                              <th className="py-3 px-4 font-semibold text-right">
+                                Hành động
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800">
+                            {filteredStudents.map((stu, rowIndex) => {
+                              const signals = describeBehavioralSignals(
+                                stu.signals
+                              );
+                              const isCommitted = Boolean(
+                                stu.commitment.studentConfirmedAt
+                              );
+                              const overdue = isStudentOverdue(stu);
+                              return (
+                                <tr
+                                  key={stu.id}
+                                  className="hover:bg-[#EFCFE3]/12 dark:hover:bg-[#0F171E]/60 transition-colors"
+                                >
+                                  <td className="py-3 px-4 align-top">
+                                    <div className="flex items-center gap-2.5">
                                       <span
-                                        className={
-                                          overdue
-                                            ? "text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2]"
-                                            : "text-xs text-slate-500 dark:text-slate-400"
-                                        }
+                                        aria-hidden="true"
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                                          AVATAR_ACCENTS[
+                                            rowIndex % AVATAR_ACCENTS.length
+                                          ]
+                                        }`}
                                       >
+                                        {initialsOf(stu.fullName)}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <div className="font-bold leading-snug">
+                                          {stu.fullName}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            Lớp {stu.className}
+                                          </span>
+                                          {stu.summary && (
+                                            <span className="rounded-full bg-[#B3DEE2]/65 text-[#133C42] px-1.5 py-0.5 text-[10px] font-semibold">
+                                              Đã có hồ sơ tổng hợp
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4 align-top">
+                                    <span
+                                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                                        STEP_ACCENTS[stu.currentStep].chip
+                                      }`}
+                                    >
+                                      {stu.currentStep}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3 px-4 align-top">
+                                    {isCommitted ? (
+                                      <div>
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF2D7] text-[#223A1E] px-2 py-0.5 text-[11px] font-bold">
+                                          <CheckCircle2 className="w-3 h-3" />
+                                          Đã chốt
+                                        </span>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-xs">
+                                          {stu.commitment.chosenOption}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <span
+                                        className={`inline-flex items-center gap-1 text-xs ${
+                                          overdue
+                                            ? "font-semibold text-[#9D2950] dark:text-[#EA9AB2]"
+                                            : "text-slate-500 dark:text-slate-400"
+                                        }`}
+                                      >
+                                        <Clock3 className="w-3.5 h-3.5" />
                                         {overdue
                                           ? `Quá hạn (${stu.commitment.deadlineDate})`
                                           : stu.commitment.deadlineDate
                                           ? `Hạn: ${stu.commitment.deadlineDate}`
                                           : "Chưa đặt hạn chốt"}
                                       </span>
-                                    </div>
-                                  )}
-                                </td>
+                                    )}
+                                  </td>
 
-                                <td className="py-3.5 px-4 align-top max-w-sm">
-                                  {signals.length === 0 ? (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                      Ổn định
-                                    </span>
-                                  ) : (
-                                    <div
-                                      className={`inline-flex items-start gap-2 px-3 py-2 rounded-xl text-xs leading-relaxed ${
-                                        stu.signals.hasSensitiveAlert
-                                          ? "bg-rose-100 text-rose-900 dark:bg-rose-950/60 dark:text-rose-200 border border-rose-300"
-                                          : "bg-[#EFCFE3]/45 text-[#4A1A2C] dark:bg-[#E27396]/15 dark:text-[#EFCFE3]"
-                                      }`}
+                                  <td className="py-3 px-4 align-top max-w-sm">
+                                    {signals.length === 0 ? (
+                                      <span className="inline-flex rounded-full bg-slate-100 dark:bg-[#0F171E] px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                        Ổn định
+                                      </span>
+                                    ) : (
+                                      <div
+                                        className={`inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] leading-relaxed ${
+                                          stu.signals.hasSensitiveAlert
+                                            ? "bg-rose-100 text-rose-900 dark:bg-rose-950/60 dark:text-rose-200 border border-rose-300"
+                                            : "bg-[#EFCFE3]/50 text-[#4A1A2C] dark:bg-[#E27396]/15 dark:text-[#EFCFE3]"
+                                        }`}
+                                      >
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                        <span>{signals[0]}</span>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3 px-4 align-top text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenedStudentId(stu.id)}
+                                      className="min-h-[34px] px-3 py-1.5 rounded-full bg-[#B3DEE2]/60 hover:bg-[#B3DEE2] text-[#133C42] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                                     >
-                                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                                      <span>{signals[0]}</span>
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="py-3.5 px-4 align-top text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => setOpenedStudentId(stu.id)}
-                                    className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#B3DEE2]/60 hover:bg-[#B3DEE2] text-[#133C42] text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>Xem hồ sơ</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Xem hồ sơ</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </section>
                 )}
               </div>
+            )}
+
+            {activeTab === "accounts" && (
+              <StudentAccountsManager
+                session={authSession ?? null}
+                students={students}
+                onStudentRenamed={(accountId, fullName) =>
+                  onStudentAccountRenamed?.(accountId, fullName)
+                }
+                onStudentDeleted={(accountId) =>
+                  onStudentAccountDeleted?.(accountId)
+                }
+              />
             )}
 
             {activeTab === "ai_queue" && (
@@ -1227,31 +1540,200 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               />
             )}
 
-            {activeTab === "thematic" && (
-              <ThematicCodingStudio
-                students={students}
-                thematicCodes={thematicCodes}
-                onUpdateThematicCodes={onUpdateThematicCodes}
-              />
-            )}
+            {activeTab === "summaries" && (
+              <section className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#17222C] overflow-hidden">
+                  <div className="p-5 sm:p-6 bg-gradient-to-r from-[#B3DEE2]/45 via-white to-[#EAF2D7]/70 dark:from-[#17222C] dark:via-[#17222C] dark:to-[#17222C] border-b border-slate-200/70 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-white/80 dark:bg-[#0F171E] border border-[#B3DEE2] flex items-center justify-center text-[#133C42] dark:text-[#B3DEE2] shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h1 className="text-lg sm:text-xl font-bold">
+                          Hồ sơ tổng hợp ·{" "}
+                          {schoolClassLabel(selectedClass)}
+                        </h1>
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5 max-w-2xl">
+                          Khi học sinh hoàn thành đủ 5 bước, hệ thống tự biên
+                          soạn Hồ sơ tổng hợp 6 phần và gửi tới tài khoản giáo
+                          viên. Bấm vào từng em để xem đầy đủ nội dung tổng hợp
+                          và tiến trình.
+                        </p>
+                      </div>
+                    </div>
 
-            {activeTab === "research" && (
-              <ResearchMode
-                appState={appState}
-                onOpenSettings={onOpenSettings}
-              />
-            )}
+                    <div className="w-full lg:w-64 shrink-0">
+                      <div className="flex items-baseline justify-between text-xs">
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">
+                          Đã nhận hồ sơ
+                        </span>
+                        <span className="tabular-nums font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                          {summaryStudents.length}/{students.length}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2.5 rounded-full bg-white/80 dark:bg-[#0F171E] border border-slate-200/70 dark:border-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[#B3DEE2] via-[#EAF2D7] to-[#E27396] transition-all"
+                          style={{
+                            width: `${
+                              students.length === 0
+                                ? 0
+                                : Math.round(
+                                    (summaryStudents.length / students.length) *
+                                      100
+                                  )
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        {students.length - summaryStudents.length} em đang chờ
+                        hoàn thành đủ 5 bước
+                      </p>
+                    </div>
+                  </div>
 
-            {activeTab === "admin" && (
-              <ContentAdmin
-                pathways={pathways}
-                experiences={experiences}
-                onUpdatePathway={onUpdatePathway}
-                onAddPathway={onAddPathway}
-                onAddExperience={onAddExperience}
-                onDeleteExperience={onDeleteExperience}
-                onImportContent={onImportContent}
-              />
+                  <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3">
+                    <div className="relative w-full lg:max-w-xs">
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Tìm học sinh theo họ tên..."
+                        aria-label="Tìm học sinh theo họ tên trong hồ sơ tổng hợp"
+                        className="w-full min-h-[38px] rounded-full border border-slate-200 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] pl-10 pr-9 py-1.5 text-xs font-medium text-[#1D242B] dark:text-[#EDF2F7] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E27396] focus:border-transparent"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Xóa từ khóa tìm kiếm"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-6 h-6 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { id: "all" as const, label: `Tất cả (${students.length})` },
+                        {
+                          id: "ready" as const,
+                          label: `Đã có hồ sơ (${summaryStudents.length})`,
+                        },
+                        {
+                          id: "pending" as const,
+                          label: `Chờ tổng hợp (${students.length - summaryStudents.length})`,
+                        },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSummaryFilter(item.id)}
+                          className={`min-h-[34px] px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors cursor-pointer ${
+                            summaryFilter === item.id
+                              ? "bg-[#E27396] border-[#E27396] text-[#2B111A] shadow-sm"
+                              : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#EA9AB2]"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {students.length === 0 ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Chưa có học sinh trong lớp này.
+                  </p>
+                ) : summarySearchStudents.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center space-y-1">
+                    <p className="text-sm font-semibold">
+                      Không có hồ sơ phù hợp bộ lọc
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Thầy/cô thử chọn &ldquo;Tất cả&rdquo; hoặc xóa từ khóa tìm
+                      kiếm.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                    {summarySearchStudents.map((stu) => (
+                      <button
+                        key={stu.id}
+                        type="button"
+                        onClick={() => setOpenedStudentId(stu.id)}
+                        className="group text-left rounded-2xl bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 hover:border-[#E27396] hover:shadow-md transition-all overflow-hidden cursor-pointer"
+                      >
+                        <div
+                          aria-hidden="true"
+                          className={`h-1.5 w-full ${
+                            stu.summary ? "bg-[#EAF2D7]" : "bg-[#EFCFE3]"
+                          }`}
+                        />
+                        <div className="p-4 space-y-3">
+                          <div className="flex items-start gap-2.5">
+                            <span
+                              aria-hidden="true"
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                                AVATAR_ACCENTS[
+                                  Math.max(
+                                    0,
+                                    students.findIndex((s) => s.id === stu.id)
+                                  ) % AVATAR_ACCENTS.length
+                                ]
+                              }`}
+                            >
+                              {initialsOf(stu.fullName)}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold truncate">
+                                {stu.fullName}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  Lớp {stu.className}
+                                </span>
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    STEP_ACCENTS[stu.currentStep].chip
+                                  }`}
+                                >
+                                  {stu.currentStep}
+                                </span>
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                stu.summary
+                                  ? "bg-[#EAF2D7] text-[#223A1E]"
+                                  : "bg-[#EFCFE3]/80 text-[#4A1A2C]"
+                              }`}
+                            >
+                              {stu.summary ? "Đã có hồ sơ" : "Chưa có hồ sơ"}
+                            </span>
+                          </div>
+
+                          <div className="rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200/70 dark:border-slate-800 px-3 py-2 text-[11px] text-slate-600 dark:text-slate-300">
+                            {stu.summary
+                              ? `Biên soạn: ${stu.summary.generatedAt}`
+                              : "Cần hoàn thành đủ 5 bước để hệ thống tổng hợp"}
+                          </div>
+
+                          <p className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2] group-hover:underline">
+                            {stu.summary
+                              ? "Xem hồ sơ tổng hợp đầy đủ →"
+                              : "Mở hồ sơ theo dõi tiến trình →"}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
           </>
         )}

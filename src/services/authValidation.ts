@@ -16,7 +16,10 @@ export interface AuthValidationIssue {
   message: string;
 }
 
-export const AUTH_ROLES: Role[] = ["student", "parent", "teacher"];
+/** Vai trò được phép tự đăng ký. Tài khoản Giáo viên chủ nhiệm do nhà trường cấp sẵn. */
+export const AUTH_ROLES: Role[] = ["student", "parent"];
+
+export const HOMEROOM_TEACHER_USERNAME = "CoThuy912";
 
 export const ROLE_LABELS: Record<Role, string> = {
   student: "Học sinh",
@@ -116,6 +119,14 @@ export function validateRegisterInput(
 ): AuthValidationIssue | null {
   const fullNameError = formatFullNameError(input.fullName);
   if (fullNameError) return { field: "fullName", message: fullNameError };
+
+  if (input.role === "teacher") {
+    return {
+      field: "role",
+      message:
+        "Tài khoản Giáo viên chủ nhiệm đã được nhà trường cấp sẵn. Vui lòng dùng mục Đăng nhập với tài khoản được cấp.",
+    };
+  }
 
   if (!AUTH_ROLES.includes(input.role)) {
     return { field: "role", message: "Vui lòng chọn vai trò của bạn." };

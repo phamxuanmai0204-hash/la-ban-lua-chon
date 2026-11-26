@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Lock,
   BookOpen,
@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Sun,
   Moon,
-  ArrowUpRight,
   MessageSquareHeart,
   Sparkles,
   Compass,
@@ -17,6 +16,7 @@ import {
   Loader2,
   AlertCircle,
   UserRound,
+  FileText,
 } from "lucide-react";
 import { CompassLogo } from "../../components/CompassLogo";
 import { AccountMenu } from "../../components/AccountMenu";
@@ -64,7 +64,7 @@ const STEP_VERBAL_DESC: Record<
   THU: {
     title: "Bước 1 – THU (Thu thập thông tin)",
     meaning:
-      "Con đang tìm hiểu bức tranh các hướng đi mở sau lớp 9 (THPT công lập, THPT tư thục, GDTX, Trung cấp nghề kết hợp văn hóa và Sơ cấp nghề) thay vì chỉ nghe lời đồn.",
+      "Con đang tìm hiểu bức tranh các hướng đi mở sau lớp 9 (THPT công lập, THPT tư thục, GDTX, Trung cấp nghề kết hợp văn hóa và Sơ cấp nghề) thay vì chỉ nghe lời đồn. Việc phân vân giữa nhiều trường THPT công lập cũng là một phần bình thường của bước này, kể cả khi con có học lực khá.",
   },
   LỌC: {
     title: "Bước 2 – LỌC (Đặt tiêu chí vừa sức)",
@@ -90,8 +90,8 @@ const STEP_VERBAL_DESC: Record<
 
 const STEP_CONVERSATION_PROMPTS: Record<JourneyStep, string[]> = {
   THU: [
-    "Trong những hướng đi con vừa tìm hiểu, có điểm nào khiến con thấy bất ngờ hoặc muốn hỏi thêm không?",
-    "Con thấy cách học ở mỗi loại hình trường khác nhau ở chỗ nào?",
+    "Con đang so sánh những trường THPT công lập nào, và điều gì khiến con khó chọn một trường?",
+    "Ngoài THPT công lập, con đã tìm hiểu thêm hướng đi nào và điều gì làm con phân vân?",
     "Bố mẹ có thể cùng con hỏi thêm thầy/cô thông tin gì còn chưa rõ không?",
   ],
   LỌC: [
@@ -116,6 +116,30 @@ const STEP_CONVERSATION_PROMPTS: Record<JourneyStep, string[]> = {
   ],
 };
 
+type ParentTab =
+  | "progress"
+  | "summary"
+  | "profile"
+  | "conversation"
+  | "articles"
+  | "meetings"
+  | "commitment";
+
+const PARENT_TABS: {
+  id: ParentTab;
+  label: string;
+  shortLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: "progress", label: "Tiến trình của con", shortLabel: "Tiến trình", icon: Compass },
+  { id: "summary", label: "Hồ sơ tổng hợp", shortLabel: "Hồ sơ tổng hợp", icon: FileText },
+  { id: "profile", label: "Hồ sơ & nhật ký của con", shortLabel: "Hồ sơ của con", icon: UserRound },
+  { id: "conversation", label: "Gợi ý trò chuyện", shortLabel: "Trò chuyện", icon: MessageSquareHeart },
+  { id: "articles", label: "Bài đọc dành cho phụ huynh", shortLabel: "Bài đọc", icon: BookOpen },
+  { id: "meetings", label: "Lịch họp ba bên", shortLabel: "Họp ba bên", icon: Calendar },
+  { id: "commitment", label: "Phiếu cam kết", shortLabel: "Phiếu cam kết", icon: FileCheck2 },
+];
+
 export const ParentView: React.FC<ParentViewProps> = ({
   student,
   meetings,
@@ -134,12 +158,16 @@ export const ParentView: React.FC<ParentViewProps> = ({
   roster,
   onLinkChild,
 }) => {
-  const [imgError, setImgError] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkChildId, setLinkChildId] = useState("");
   const [linkPin, setLinkPin] = useState("");
   const [linkError, setLinkError] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<ParentTab>("progress");
+
+  useEffect(() => {
+    setActiveTab("progress");
+  }, [selectedChildId]);
 
   const linkClassStudents = roster.classes.flatMap((item) => item.students);
   const linkedCount = account?.linkedChildren?.length ?? 0;
@@ -216,39 +244,6 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-5 text-sm font-medium text-slate-600 dark:text-slate-300">
-            <a
-              href="#trang-chu-phu-huynh"
-              className="hover:text-[#1D242B] dark:hover:text-white whitespace-nowrap shrink-0"
-            >
-              Tiến trình con
-            </a>
-            <a
-              href="#goi-y-tro-chuyen"
-              className="hover:text-[#1D242B] dark:hover:text-white whitespace-nowrap shrink-0"
-            >
-              Gợi ý trò chuyện
-            </a>
-            <a
-              href="#bai-doc-lien-thong"
-              className="hover:text-[#1D242B] dark:hover:text-white whitespace-nowrap shrink-0"
-            >
-              Bài đọc
-            </a>
-            <a
-              href="#hop-ba-ben"
-              className="hover:text-[#1D242B] dark:hover:text-white whitespace-nowrap shrink-0"
-            >
-              Lịch họp ba bên
-            </a>
-            <a
-              href="#xac-nhan-cam-ket"
-              className="hover:text-[#1D242B] dark:hover:text-white whitespace-nowrap shrink-0"
-            >
-              Phiếu cam kết
-            </a>
-          </nav>
-
           <div className="flex items-center gap-2 shrink-0">
             {account && onLogout ? (
               <AccountMenu
@@ -269,7 +264,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
         </div>
       </header>
 
-      <div className="border-b border-slate-200/70 dark:border-slate-800 bg-[#EFCFE3]/35 dark:bg-[#17222C]/60">
+      <div className="border-b border-slate-200/70 dark:border-slate-800 bg-gradient-to-r from-[#EFCFE3]/50 via-white to-[#B3DEE2]/30 dark:from-[#17222C] dark:via-[#17222C] dark:to-[#17222C]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">
@@ -339,7 +334,35 @@ export const ParentView: React.FC<ParentViewProps> = ({
         </div>
       </div>
 
+      <div className="border-b border-slate-200/70 dark:border-slate-800 bg-white dark:bg-[#17222C]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex gap-2 overflow-x-auto">
+          {PARENT_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={active ? "page" : undefined}
+                className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer ${
+                  active
+                    ? "bg-[#E27396] text-[#2B111A] shadow-sm"
+                    : "bg-[#F1F4F8] dark:bg-[#0F171E] text-slate-700 dark:text-slate-300 hover:bg-[#EFCFE3]/50 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+        {activeTab === "progress" && (
+        <>
         {/* Trang chủ phụ huynh: Con đang ở bước nào (bằng lời) */}
         <section
           id="trang-chu-phu-huynh"
@@ -387,12 +410,58 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
           </div>
         </section>
-
-        {student.summary && student.shareWithParent && (
-          <StudentSummaryReport summary={student.summary} audience="parent" />
+        </>
         )}
 
-        {/* Gợi ý trò chuyện với con: 3 câu hỏi mở theo bước hiện tại */}
+        {activeTab === "summary" && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#EFCFE3]/60 dark:bg-[#EFCFE3]/20 flex items-center justify-center text-[#9D2950] dark:text-[#EA9AB2] shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold">
+                  Hồ sơ tổng hợp của con
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5">
+                  Khi con hoàn thành đủ 5 bước, hệ thống tự biên soạn Hồ sơ tổng
+                  hợp 6 phần và gửi tới tài khoản phụ huynh để bố mẹ nắm được
+                  toàn bộ hành trình của con.
+                </p>
+              </div>
+            </div>
+
+            {!student.shareWithParent ? (
+              <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#17222C] border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-3">
+                <Lock className="w-9 h-9 mx-auto text-[#9D2950] dark:text-[#EA9AB2]" />
+                <h2 className="text-lg font-bold">
+                  Con chưa bật quyền chia sẻ hồ sơ với phụ huynh
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+                  Khi con bật &ldquo;Chia sẻ với phụ huynh&rdquo; trong tài khoản
+                  của mình, Hồ sơ tổng hợp và nhật ký của con sẽ hiển thị tại
+                  đây. Con có thể tắt chia sẻ bất cứ lúc nào.
+                </p>
+              </div>
+            ) : student.summary ? (
+              <StudentSummaryReport summary={student.summary} audience="parent" />
+            ) : (
+              <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 text-center space-y-3">
+                <FileText className="w-9 h-9 mx-auto text-[#133C42] dark:text-[#B3DEE2]" />
+                <h2 className="text-lg font-bold">
+                  Hồ sơ tổng hợp chưa sẵn sàng
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+                  Con đang ở bước {student.currentStep}. Hồ sơ tổng hợp sẽ được
+                  hệ thống biên soạn và gửi tới bố mẹ ngay khi con hoàn thành đủ
+                  5 bước Thu – Lọc – Thử – Chốt – Cam kết.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "conversation" && (
         <section
           id="goi-y-tro-chuyen"
           className="bg-white dark:bg-[#17222C] border border-[#EA9AB2]/60 dark:border-slate-800 rounded-2xl p-6 space-y-4"
@@ -427,8 +496,9 @@ export const ParentView: React.FC<ParentViewProps> = ({
             ))}
           </div>
         </section>
+        )}
 
-        {/* Hồ sơ của con (chỉ mở khi con bật chia sẻ) */}
+        {activeTab === "profile" && (
         <section
           id="ho-so-cua-con"
           className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5"
@@ -507,69 +577,188 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
           )}
         </section>
+        )}
 
-        {/* 2 Bài đọc ngắn dành cho Phụ huynh */}
+        {activeTab === "articles" && (
+        /* 2 Bài đọc ngắn dành cho Phụ huynh */
         <section id="bai-doc-lien-thong" className="space-y-6">
-          <div className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-            <div className="lg:col-span-5 bg-[#EAF2D7]/40 dark:bg-[#0F171E] flex items-center justify-center">
-              {!imgError ? (
-                <img
-                  src="/src/assets/images/pathway_open_bridge_1795160462681.jpg"
-                  alt="Minh họa xưởng thực hành kết nối liền mạch với cao đẳng và đại học"
-                  referrerPolicy="no-referrer"
-                  onError={() => setImgError(true)}
-                  className="w-full h-full object-cover min-h-[220px]"
-                />
-              ) : (
-                <div className="p-8 text-center space-y-2">
-                  <BookOpen className="w-10 h-10 mx-auto text-[#223A1E]" />
-                  <p className="text-sm font-semibold">Học nghề vẫn có cơ hội học tiếp</p>
-                </div>
-              )}
-            </div>
-
-            <div className="lg:col-span-7 p-6 sm:p-8 space-y-4">
-              <p className="text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7]">
-                Bài đọc ngắn 1 dành cho Phụ huynh
-              </p>
-              <h2 className="text-xl sm:text-2xl font-bold">
-                Học nghề rồi vẫn học lên được
-              </h2>
-              <div className="space-y-3 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
-                <p>
-                  Nhiều bố mẹ lo lắng rằng nếu con không vào lớp 10 THPT mà chọn Trung cấp nghề thì cánh cửa học vấn sẽ khép lại. Thực tế hiện nay, học sinh tốt nghiệp THCS vào học Trung cấp nghề có thể học song song chương trình văn hóa THPT.
-                </p>
-                <p>
-                  Sau khi có bằng Trung cấp nghề và hoàn thành văn hóa, con hoàn toàn có thể dự tuyển hoặc học tiếp lên bậc Cao đẳng nghề, rồi Đại học theo quy định hiện hành — hoặc đi làm sớm để tích lũy tay nghề, thu nhập rồi quay lại học tiếp khi đã sẵn sàng.
-                </p>
-                <p className="font-medium text-[#133C42] dark:text-[#B3DEE2] inline-flex items-center gap-1.5">
-                  <ArrowUpRight className="w-4 h-4 shrink-0" />
-                  <span>
-                    Điều quan trọng nhất là con đi một con đường vừa sức, không bỏ cuộc giữa chừng.
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-
           <article className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-4">
+            <p className="text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7]">
+              Bài đọc ngắn 1 dành cho Phụ huynh
+            </p>
+            <h2 className="text-xl sm:text-2xl font-bold">
+              Vai trò của sự đồng cảm, thấu hiểu của phụ huynh học sinh
+            </h2>
+            <div className="space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
+              <p>
+                Khi con bước vào năm cuối cấp, điều con cần không chỉ là thêm
+                thông tin về trường hay ngành nghề, mà còn là cảm giác được
+                hiểu. Nhiều em học lực khá, thậm chí rất tốt, vẫn có thể phân
+                vân hàng tháng trời giữa vài trường THPT công lập, liên tục đổi
+                nguyện vọng vì sợ chọn sai hoặc sợ bỏ lỡ một lựa chọn tốt hơn.
+              </p>
+              <p>
+                Sự đồng cảm của bố mẹ không có nghĩa là đồng ý với mọi lựa chọn
+                của con, mà là lắng nghe trước khi phán xét. Khi con nói
+                &ldquo;con chưa biết chọn trường nào&rdquo;, thay vì đáp lại
+                bằng áp lực hay lời trách, bố mẹ có thể ghi nhận cảm xúc của
+                con: &ldquo;Bố/mẹ hiểu là con đang cân nhắc rất nhiều thứ.
+                Mình cùng xem từng bước nhé.&rdquo;
+              </p>
+              <p>
+                Được thấu hiểu, con sẽ dám nói ra điều thật lòng — kể cả những
+                lo lắng tưởng như &ldquo;không đáng nói&rdquo; như sợ xa nhà,
+                sợ không theo kịp bạn bè hay sợ làm bố mẹ thất vọng. Khi cảm xúc
+                được gọi tên, con bớt căng thẳng và có thể quay lại việc so sánh
+                các lựa chọn một cách bình tĩnh hơn.
+              </p>
+              <p>
+                Hãy nhớ rằng phân vân không phải là dấu hiệu của sự yếu kém. Đó
+                là dấu hiệu con đang nghiêm túc với tương lai của mình. Cũng
+                đừng cho rằng chỉ những bạn học lực chưa tốt mới cần được tư
+                vấn: những bạn học khá cũng có thể mắc kẹt trong vòng xoáy
+                &ldquo;sợ bỏ lỡ lựa chọn tốt hơn&rdquo; và cần người lớn đồng
+                hành.
+              </p>
+              <div className="p-4 rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border border-[#EAF2D7] dark:border-slate-700 space-y-2">
+                <p className="font-semibold text-[#223A1E] dark:text-[#EAF2D7]">
+                  Bốn việc nhỏ bố mẹ có thể làm ngay:
+                </p>
+                <ul className="list-disc list-inside space-y-1.5">
+                  <li>Hỏi câu mở, không dẫn dắt, và cho con thời gian trả lời.</li>
+                  <li>Nhắc lại điều con vừa nói để con biết mình đang được lắng nghe.</li>
+                  <li>Tránh so sánh con với &ldquo;con nhà người ta&rdquo; hay với anh chị em.</li>
+                  <li>Giúp con đặt một mốc thời gian chốt nhẹ nhàng, thay vì thúc ép.</li>
+                </ul>
+              </div>
+              <p className="font-medium text-[#133C42] dark:text-[#B3DEE2]">
+                Khi được thấu hiểu, con sẽ tự tin nói ra lí do và tự chịu trách
+                nhiệm với lựa chọn của mình. Đó là nền tảng bền vững hơn bất kỳ
+                quyết định nào do người lớn chọn thay.
+              </p>
+            </div>
+          </article>
+
+          <article className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-5">
             <p className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2]">
               Bài đọc ngắn 2 dành cho Phụ huynh
             </p>
             <h2 className="text-xl sm:text-2xl font-bold">
               Vì sao nên để con tự nói lí do lựa chọn
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
+            <div className="space-y-4 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
               <p>
-                Ở tuổi 14–15, khi đứng trước nhiều ngã rẽ, nhiều em dễ chọn trường theo lời bạn rủ hoặc làm theo sắp xếp của người lớn để cho xong. Tuy nhiên, nếu con chọn một hướng đi mà chưa tự giải thích được vì sao hợp với mình, con rất dễ nản lòng hoặc đổi ý giữa chừng khi gặp môn học khó.
+                Ở tuổi 14–15, khi đứng trước nhiều ngã rẽ, nhiều em dễ chọn
+                trường theo lời bạn rủ hoặc làm theo sắp xếp của người lớn để
+                cho xong. Tuy nhiên, nếu con chọn một hướng đi mà chưa tự giải
+                thích được vì sao hợp với mình, con rất dễ nản lòng hoặc đổi ý
+                giữa chừng khi gặp môn học khó hoặc khi thấy bạn bè chọn hướng
+                khác.
               </p>
-              <p>
-                Khi bố mẹ kiên nhẫn lắng nghe và để con tự viết ra lí do bằng lời của chính con — dựa trên sức học, sở thích và hoàn cảnh gia đình — con học được cách tự chịu trách nhiệm với quyết định của mình. Sự đồng thuận từ bên trong giúp con đi bền hơn nhiều so với một lựa chọn bị ép buộc.
+
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                  1. Lợi ích tâm lý: con bớt lo, bố mẹ bớt sốt ruột
+                </h3>
+                <p>
+                  Khi được tự nói ra lí do, con cảm thấy lựa chọn này là của
+                  mình chứ không phải bị áp đặt. Cảm giác &ldquo;mình được kiểm
+                  soát&rdquo; giúp giảm lo âu, tăng tự tin và giảm hẳn những
+                  cuộc tranh luận lặp đi lặp lại trong gia đình. Bố mẹ cũng có
+                  thể yên tâm hơn vì hiểu rõ con đang dựa trên tiêu chí nào.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                  2. Học cách tự chịu trách nhiệm với quyết định
+                </h3>
+                <p>
+                  Một lựa chọn do người lớn chọn thay thường đi kèm tâm thế
+                  &ldquo;tại bố mẹ bắt con chọn&rdquo; mỗi khi gặp khó khăn.
+                  Ngược lại, khi con tự viết lí do, con biết mình đã cân nhắc
+                  điều gì và sẵn sàng nhận phần trách nhiệm của mình. Đây là kĩ
+                  năng quan trọng không chỉ cho việc chọn trường mà còn cho
+                  nhiều quyết định sau này.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                  3. Nhận diện mong muốn và tiêu chí thật sự của con
+                </h3>
+                <p>
+                  Khi con viết ra lí do, bố mẹ sẽ thấy điều con thật sự quan
+                  tâm — có thể là học phí, khoảng cách, môi trường bạn bè, cơ
+                  hội học tiếp hay một ước mơ riêng. Đôi khi tiêu chí của con
+                  khác với điều bố mẹ tưởng. Đây là lúc để cùng con làm rõ:
+                  &ldquo;Điều gì là quan trọng nhất với con?&rdquo;,
+                  &ldquo;Con sẵn sàng đánh đổi điều gì?&rdquo;,
+                  &ldquo;Nếu chỉ được giữ một tiêu chí, con sẽ giữ tiêu chí
+                  nào?&rdquo;
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                  4. Lắng nghe thay vì nói thay hoặc áp đặt
+                </h3>
+                <p>
+                  Lắng nghe không có nghĩa là im lặng hoàn toàn. Bố mẹ vẫn có
+                  thể chia sẻ hiểu biết và mối lo của mình, nhưng nên tách phần
+                  &ldquo;thông tin&rdquo; khỏi phần &ldquo;quyết định thay
+                  con&rdquo;. Một vài phản xạ nên tránh:
+                </p>
+                <ul className="list-disc list-inside space-y-1.5">
+                  <li>
+                    Nói thay: &ldquo;Con phải chọn trường này, bố mẹ đã tính
+                    rồi.&rdquo;
+                  </li>
+                  <li>
+                    Phủ nhận cảm xúc: &ldquo;Có gì mà phải phân vân, chuyện nhỏ
+                    thôi.&rdquo;
+                  </li>
+                  <li>
+                    So sánh: &ldquo;Sao con không được như bạn A?&rdquo;
+                  </li>
+                  <li>
+                    Dọa dẫm: &ldquo;Chọn sai là đời con hỏng đấy.&rdquo;
+                  </li>
+                </ul>
+                <p>
+                  Thay vào đó, bố mẹ có thể phản hồi theo hướng đồng hành:
+                  &ldquo;Bố/mẹ nghe con nói là con thích trường này vì gần nhà
+                  và có môn con giỏi. Mình thử so thêm với trường kia xem sao,
+                  rồi con quyết định nhé.&rdquo;
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                  5. Khi con đổi ý, hãy coi đó là một bước học
+                </h3>
+                <p>
+                  Việc con thay đổi nguyện vọng vài lần không nhất thiết là dấu
+                  hiệu xấu. Đó có thể là quá trình con đang học cách so sánh và
+                  tự điều chỉnh. Điều quan trọng là bố mẹ giúp con nhận ra vì
+                  sao mình đổi ý, điều gì mới được khám phá, và cuối cùng con
+                  chốt dựa trên tiêu chí nào. Như vậy, mỗi lần đổi ý đều trở
+                  thành một bước tiến thay vì một thất bại.
+                </p>
+              </div>
+
+              <p className="font-medium text-[#133C42] dark:text-[#B3DEE2]">
+                Sự đồng thuận từ bên trong giúp con đi bền hơn nhiều so với một
+                lựa chọn bị ép buộc. Khi con được tự nói lí do, con không chỉ
+                chọn được trường phù hợp mà còn học được cách tin vào chính
+                mình.
               </p>
             </div>
           </article>
         </section>
+        )}
 
+        {activeTab === "meetings" && (
         <section
           id="hop-ba-ben"
           className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4"
@@ -659,7 +848,9 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
           )}
         </section>
+        )}
 
+        {activeTab === "commitment" && (
         <section
           id="xac-nhan-cam-ket"
           className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4"
@@ -726,6 +917,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
             </div>
           )}
         </section>
+        )}
       </main>
 
       {linkOpen && onLinkChild && (

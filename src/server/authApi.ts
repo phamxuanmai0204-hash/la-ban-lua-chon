@@ -1,8 +1,13 @@
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  HOMEROOM_TEACHER_USERNAME,
+  formatFullNameError,
+  formatPasswordError,
+  formatPinError,
+  formatUsernameError,
   normalizeUsername,
   usernameKey,
   validateLoginInput,
@@ -20,13 +25,26 @@ import type {
   LinkedChild,
   RegisterAccountInput,
   Role,
+  Student,
 } from "../types.ts";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const ACCOUNTS_FILE = path.join(DATA_DIR, "auth-accounts.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "auth-sessions.json");
+const STUDENT_RECORDS_FILE = path.join(DATA_DIR, "student-records.json");
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_PATTERN = /^\d{4}$/;
+
+/**
+ * Phạm vi hiện tại chỉ có MỘT lớp 9 với MỘT giáo viên chủ nhiệm duy nhất.
+ * Tài khoản này được tạo sẵn mỗi lần máy chủ khởi động, không cho tự đăng ký.
+ */
+const HOMEROOM_TEACHER = {
+  id: "homeroom-teacher-cothuy912",
+  fullName: "Cô Thủy",
+  username: HOMEROOM_TEACHER_USERNAME,
+  password: "041126",
+};
 
 interface StoredAccount {
   id: string;
@@ -40,6 +58,8 @@ interface StoredAccount {
   className?: string;
   parentPin?: string;
   linkedChildren?: LinkedChild[];
+  /** Giáo viên chủ nhiệm được liên kết tự động (luôn là CoThuy912). */
+  homeroomTeacherUsername?: string;
 }
 
 interface StoredSession {
@@ -47,6 +67,17 @@ interface StoredSession {
   userId: string;
   createdAt: number;
   expiresAt: number;
+}
+
+/** Bản dữ liệu học sinh do chính thiết bị của em gửi lên cho giáo viên chủ nhiệm. */
+interface StoredStudentRecord {
+  studentId: string;
+  accountId: string;
+  fullName: string;
+  className: string;
+  teacherUsername: string;
+  updatedAt: string;
+  student: Student;
 }
 
 /**
@@ -98,6 +129,7 @@ class JsonCollection<T> {
 
 const accountsStore = new JsonCollection<StoredAccount>(ACCOUNTS_FILE);
 const sessionsStore = new JsonCollection<StoredSession>(SESSIONS_FILE);
+const recordsStore = new JsonCollection<StoredStudentRecord>(STUDENT_RECORDS_FILE);
 
 function hashPassword(password: string, salt: string): string {
   return crypto.scryptSync(password, salt, 64).toString("hex");
@@ -132,6 +164,78 @@ function toAuthUser(account: StoredAccount): AuthUser {
     user.linkedChildren = account.linkedChildren ?? [];
   }
   return user;
+}
+
+/**
+ * Bảo đảm luôn có đúng tài khoản giáo viên chủ nhiệm cố định CoThuy912.
+ * Nếu tài khoản đã tồn tại nhưng mật khẩu/vai trò bị lệch, đưa về đúng cấu hình.
+ */
+async function ensureHomeroomTeacherAccount(): Promise<void> {
+  let accounts = await accountsStore.read();
+  let changed = false;
+  const key = usernameKey(HOMEROOM_TEACHER.username);
+  const existing = accounts.find((account) => account.usernameKey === key);
+
+  if (!existing) {
+    changed = true;
+    const idTaken = accounts.some(
+      (account) => account.id === HOMEROOM_TEACHER.id
+    );
+    const salt = crypto.randomBytes(16).toString("hex");
+    const account: StoredAccount = {
+      id: idTaken ? crypto.randomUUID() : HOMEROOM_TEACHER.id,
+      fullName: HOMEROOM_TEACHER.fullName,
+      role: "teacher",
+      username: HOMEROOM_TEACHER.username,
+      usernameKey: key,
+      passwordHash: hashPassword(HOMEROOM_TEACHER.password, salt),
+      salt,
+      createdAt: new Date().toISOString(),
+    };
+    accounts = [...accounts, account];
+  } else {
+    const passwordMatches = verifyPassword(
+      HOMEROOM_TEACHER.password,
+      existing.salt,
+      existing.passwordHash
+    );
+    if (existing.role !== "teacher" || !passwordMatches) {
+      changed = true;
+      const salt = crypto.randomBytes(16).toString("hex");
+      const updated: StoredAccount = {
+        ...existing,
+        fullName: HOMEROOM_TEACHER.fullName,
+        role: "teacher",
+        username: HOMEROOM_TEACHER.username,
+        usernameKey: key,
+        salt,
+        passwordHash: hashPassword(HOMEROOM_TEACHER.password, salt),
+      };
+      accounts = accounts.map((account) =>
+        account.id === existing.id ? updated : account
+      );
+    }
+  }
+
+  // Mọi tài khoản học sinh của lớp đều thuộc giáo viên chủ nhiệm duy nhất.
+  const needsBackfill = accounts.some(
+    (account) => account.role === "student" && !account.homeroomTeacherUsername
+  );
+  if (needsBackfill) {
+    changed = true;
+    accounts = accounts.map((account) =>
+      account.role === "student"
+        ? {
+            ...account,
+            homeroomTeacherUsername: HOMEROOM_TEACHER.username,
+          }
+        : account
+    );
+  }
+
+  if (changed) {
+    await accountsStore.replace(accounts);
+  }
 }
 
 function getBearerToken(req: Request): string | null {
@@ -248,7 +352,77 @@ function buildRoster(accounts: StoredAccount[]): SchoolRoster {
   return { classes };
 }
 
-export function registerAuthRoutes(app: Express): void {
+interface StudentAccountSummary {
+  id: string;
+  fullName: string;
+  username: string;
+  className: string;
+  parentPin: string;
+  createdAt: string;
+  linkedParents: { id: string; fullName: string; username: string }[];
+}
+
+function toStudentAccountSummary(
+  account: StoredAccount,
+  accounts: StoredAccount[]
+): StudentAccountSummary {
+  const studentCode = `acc:${account.id}`;
+  const linkedParents = accounts
+    .filter(
+      (item) =>
+        item.role === "parent" &&
+        (item.linkedChildren ?? []).some((child) => child.studentId === studentCode)
+    )
+    .map((parent) => ({
+      id: parent.id,
+      fullName: parent.fullName,
+      username: parent.username,
+    }));
+
+  return {
+    id: account.id,
+    fullName: account.fullName,
+    username: account.username,
+    className: DEFAULT_CLASS_ID,
+    parentPin: account.parentPin ?? "",
+    createdAt: account.createdAt,
+    linkedParents,
+  };
+}
+
+async function requireTeacher(
+  req: Request,
+  res: Response
+): Promise<StoredAccount | null> {
+  const token = getBearerToken(req);
+  const account = token ? await findAccountByToken(token) : null;
+  if (!account) {
+    res.status(401).json({
+      error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      code: "UNAUTHORIZED",
+    });
+    return null;
+  }
+  if (account.role !== "teacher") {
+    res.status(403).json({
+      error: "Chỉ tài khoản Giáo viên mới quản lý được danh sách tài khoản học sinh.",
+      code: "FORBIDDEN",
+    });
+    return null;
+  }
+  return account;
+}
+
+function readString(
+  body: Record<string, unknown>,
+  key: string
+): string {
+  return typeof body[key] === "string" ? (body[key] as string) : "";
+}
+
+export async function registerAuthRoutes(app: Express): Promise<void> {
+  await ensureHomeroomTeacherAccount();
+
   app.post("/api/auth/register", async (req, res) => {
     const input = parseRegisterBody(req);
     const issue = validateRegisterInput(input);
@@ -257,6 +431,15 @@ export function registerAuthRoutes(app: Express): void {
         error: issue.message,
         code: "INVALID_INPUT",
         field: issue.field,
+      });
+      return;
+    }
+    if (input.role !== "student" && input.role !== "parent") {
+      res.status(403).json({
+        error:
+          "Chỉ tài khoản Học sinh và Phụ huynh được tự đăng ký. Tài khoản Giáo viên chủ nhiệm do nhà trường cấp sẵn.",
+        code: "ROLE_NOT_ALLOWED",
+        field: "role",
       });
       return;
     }
@@ -321,6 +504,8 @@ export function registerAuthRoutes(app: Express): void {
       className,
       parentPin,
       linkedChildren,
+      homeroomTeacherUsername:
+        input.role === "student" ? HOMEROOM_TEACHER.username : undefined,
     };
 
     await accountsStore.replace([...accounts, account]);
@@ -511,6 +696,371 @@ export function registerAuthRoutes(app: Express): void {
       accounts.map((item) => (item.id === updated.id ? updated : item))
     );
     res.json({ user: toAuthUser(updated) });
+  });
+
+  /**
+   * Giáo viên xem danh sách tài khoản học sinh kèm mã PIN liên kết phụ huynh.
+   */
+  app.get("/api/school/student-accounts", async (req, res) => {
+    if (!(await requireTeacher(req, res))) return;
+
+    const accounts = await accountsStore.read();
+    const studentAccounts = accounts
+      .filter((account) => account.role === "student")
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"))
+      .map((account) => toStudentAccountSummary(account, accounts));
+
+    res.json({ accounts: studentAccounts });
+  });
+
+  /**
+   * Giáo viên tạo tài khoản học sinh mới (lớp cố định Lớp 9, không sinh dữ liệu mẫu).
+   */
+  app.post("/api/school/student-accounts", async (req, res) => {
+    if (!(await requireTeacher(req, res))) return;
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const fullName = readString(body, "fullName").trim();
+    const username = normalizeUsername(readString(body, "username"));
+    const password = readString(body, "password");
+    const parentPin = readString(body, "parentPin").trim();
+
+    const fullNameError = formatFullNameError(fullName);
+    if (fullNameError) {
+      res.status(400).json({
+        error: fullNameError,
+        code: "INVALID_INPUT",
+        field: "fullName",
+      });
+      return;
+    }
+    const usernameError = formatUsernameError(username);
+    if (usernameError) {
+      res.status(400).json({
+        error: usernameError,
+        code: "INVALID_INPUT",
+        field: "username",
+      });
+      return;
+    }
+    const passwordError = formatPasswordError(password);
+    if (passwordError) {
+      res.status(400).json({
+        error: passwordError,
+        code: "INVALID_INPUT",
+        field: "password",
+      });
+      return;
+    }
+    if (parentPin) {
+      const pinError = formatPinError(parentPin);
+      if (pinError) {
+        res.status(400).json({
+          error: pinError,
+          code: "INVALID_INPUT",
+          field: "parentPin",
+        });
+        return;
+      }
+    }
+
+    const accounts = await accountsStore.read();
+    const key = usernameKey(username);
+    if (accounts.some((account) => account.usernameKey === key)) {
+      res.status(409).json({
+        error:
+          "Tên đăng nhập hoặc email này đã được dùng. Vui lòng chọn tên khác.",
+        code: "USERNAME_TAKEN",
+        field: "username",
+      });
+      return;
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const account: StoredAccount = {
+      id: crypto.randomUUID(),
+      fullName,
+      role: "student",
+      username,
+      usernameKey: key,
+      passwordHash: hashPassword(password, salt),
+      salt,
+      createdAt: new Date().toISOString(),
+      className: DEFAULT_CLASS_ID,
+      parentPin: parentPin || generateParentPin(),
+      homeroomTeacherUsername: HOMEROOM_TEACHER.username,
+    };
+
+    await accountsStore.replace([...accounts, account]);
+    res.status(201).json({
+      account: toStudentAccountSummary(account, [...accounts, account]),
+    });
+  });
+
+  /**
+   * Giáo viên chỉnh sửa họ tên, tên đăng nhập, mã PIN phụ huynh hoặc đặt lại mật khẩu.
+   */
+  app.post("/api/school/student-accounts/:id/update", async (req, res) => {
+    if (!(await requireTeacher(req, res))) return;
+
+    const accounts = await accountsStore.read();
+    const target = accounts.find(
+      (account) => account.id === req.params.id && account.role === "student"
+    );
+    if (!target) {
+      res.status(404).json({
+        error: "Không tìm thấy tài khoản học sinh này.",
+        code: "NOT_FOUND",
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const fullName = readString(body, "fullName").trim();
+    const username = normalizeUsername(readString(body, "username"));
+    const parentPin = readString(body, "parentPin").trim();
+    const newPassword = readString(body, "newPassword");
+
+    const fullNameError = formatFullNameError(fullName);
+    if (fullNameError) {
+      res.status(400).json({
+        error: fullNameError,
+        code: "INVALID_INPUT",
+        field: "fullName",
+      });
+      return;
+    }
+    const usernameError = formatUsernameError(username);
+    if (usernameError) {
+      res.status(400).json({
+        error: usernameError,
+        code: "INVALID_INPUT",
+        field: "username",
+      });
+      return;
+    }
+    if (parentPin) {
+      const pinError = formatPinError(parentPin);
+      if (pinError) {
+        res.status(400).json({
+          error: pinError,
+          code: "INVALID_INPUT",
+          field: "parentPin",
+        });
+        return;
+      }
+    }
+    if (newPassword) {
+      const passwordError = formatPasswordError(newPassword);
+      if (passwordError) {
+        res.status(400).json({
+          error: passwordError,
+          code: "INVALID_INPUT",
+          field: "password",
+        });
+        return;
+      }
+    }
+
+    const key = usernameKey(username);
+    if (
+      accounts.some(
+        (account) => account.id !== target.id && account.usernameKey === key
+      )
+    ) {
+      res.status(409).json({
+        error:
+          "Tên đăng nhập hoặc email này đã được dùng. Vui lòng chọn tên khác.",
+        code: "USERNAME_TAKEN",
+        field: "username",
+      });
+      return;
+    }
+
+    let updated: StoredAccount = {
+      ...target,
+      fullName,
+      username,
+      usernameKey: key,
+      parentPin: parentPin || target.parentPin,
+    };
+    if (newPassword) {
+      const salt = crypto.randomBytes(16).toString("hex");
+      updated = {
+        ...updated,
+        salt,
+        passwordHash: hashPassword(newPassword, salt),
+      };
+    }
+
+    const studentCode = `acc:${updated.id}`;
+    const nextAccounts = accounts.map((account) => {
+      if (account.id === updated.id) return updated;
+      if (account.role === "parent") {
+        const linked = account.linkedChildren ?? [];
+        if (linked.some((child) => child.studentId === studentCode)) {
+          return {
+            ...account,
+            linkedChildren: linked.map((child) =>
+              child.studentId === studentCode
+                ? { ...child, displayName: updated.fullName }
+                : child
+            ),
+          };
+        }
+      }
+      return account;
+    });
+
+    await accountsStore.replace(nextAccounts);
+
+    const records = await recordsStore.read();
+    if (records.some((record) => record.accountId === updated.id)) {
+      await recordsStore.replace(
+        records.map((record) =>
+          record.accountId === updated.id
+            ? {
+                ...record,
+                fullName: updated.fullName,
+                student: { ...record.student, fullName: updated.fullName },
+              }
+            : record
+        )
+      );
+    }
+
+    if (newPassword) {
+      const sessions = (await sessionsStore.read()).filter(
+        (session) => session.userId !== updated.id
+      );
+      await sessionsStore.replace(sessions);
+    }
+
+    res.json({
+      account: toStudentAccountSummary(updated, nextAccounts),
+    });
+  });
+
+  /**
+   * Giáo viên xóa hẳn tài khoản học sinh và gỡ liên kết phụ huynh liên quan.
+   */
+  app.post("/api/school/student-accounts/:id/delete", async (req, res) => {
+    if (!(await requireTeacher(req, res))) return;
+
+    const accounts = await accountsStore.read();
+    const target = accounts.find(
+      (account) => account.id === req.params.id && account.role === "student"
+    );
+    if (!target) {
+      res.status(404).json({
+        error: "Không tìm thấy tài khoản học sinh này.",
+        code: "NOT_FOUND",
+      });
+      return;
+    }
+
+    const studentCode = `acc:${target.id}`;
+    const nextAccounts = accounts
+      .filter((account) => account.id !== target.id)
+      .map((account) => {
+        if (account.role !== "parent") return account;
+        const linked = account.linkedChildren ?? [];
+        if (!linked.some((child) => child.studentId === studentCode)) {
+          return account;
+        }
+        return {
+          ...account,
+          linkedChildren: linked.filter(
+            (child) => child.studentId !== studentCode
+          ),
+        };
+      });
+    await accountsStore.replace(nextAccounts);
+
+    const sessions = (await sessionsStore.read()).filter(
+      (session) => session.userId !== target.id
+    );
+    await sessionsStore.replace(sessions);
+
+    const records = await recordsStore.read();
+    if (records.some((record) => record.accountId === target.id)) {
+      await recordsStore.replace(
+        records.filter((record) => record.accountId !== target.id)
+      );
+    }
+
+    res.status(204).end();
+  });
+
+  /**
+   * Học sinh gửi bản dữ liệu mới nhất (hồ sơ, hành trình, hồ sơ tổng hợp) về máy chủ.
+   * Giáo viên chủ nhiệm luôn là CoThuy912 nên dữ liệu đi thẳng về tài khoản này.
+   */
+  app.post("/api/student/records", async (req, res) => {
+    const token = getBearerToken(req);
+    const account = token ? await findAccountByToken(token) : null;
+    if (!account) {
+      res.status(401).json({
+        error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        code: "UNAUTHORIZED",
+      });
+      return;
+    }
+    if (account.role !== "student") {
+      res.status(403).json({
+        error: "Chỉ tài khoản Học sinh mới gửi được dữ liệu hành trình.",
+        code: "FORBIDDEN",
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const student = body.student as Student | undefined;
+    if (
+      !student ||
+      typeof student !== "object" ||
+      student.id !== `acc:${account.id}`
+    ) {
+      res.status(400).json({
+        error: "Dữ liệu học sinh không hợp lệ.",
+        code: "INVALID_INPUT",
+      });
+      return;
+    }
+
+    const records = await recordsStore.read();
+    const now = new Date().toISOString();
+    const record: StoredStudentRecord = {
+      studentId: student.id,
+      accountId: account.id,
+      fullName:
+        typeof student.fullName === "string"
+          ? student.fullName
+          : account.fullName,
+      className:
+        typeof student.className === "string"
+          ? student.className
+          : DEFAULT_CLASS_ID,
+      teacherUsername: HOMEROOM_TEACHER.username,
+      updatedAt: now,
+      student,
+    };
+    await recordsStore.replace([
+      ...records.filter((item) => item.accountId !== account.id),
+      record,
+    ]);
+    res.json({ ok: true, updatedAt: now });
+  });
+
+  /**
+   * Giáo viên chủ nhiệm nhận dữ liệu học sinh do các thiết bị của học sinh gửi lên.
+   */
+  app.get("/api/school/student-records", async (req, res) => {
+    if (!(await requireTeacher(req, res))) return;
+    const records = (await recordsStore.read())
+      .slice()
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"));
+    res.json({ records });
   });
 
   /**

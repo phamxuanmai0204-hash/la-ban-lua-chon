@@ -233,8 +233,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     ) : null;
 
   return (
-    <div className="min-h-screen bg-[#FAFBFD] dark:bg-[#0F171E] text-[#1D242B] dark:text-[#EDF2F7] flex flex-col">
-      <header className="border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#17222C]/90 backdrop-blur-md sticky top-0 z-30">
+    <div className="relative min-h-screen overflow-hidden bg-[#FAFBFD] dark:bg-[#0F171E] text-[#1D242B] dark:text-[#EDF2F7] flex flex-col">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-0"
+      >
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#EFCFE3]/50 dark:bg-[#EFCFE3]/5 blur-3xl" />
+        <div className="absolute top-1/3 -right-28 h-80 w-80 rounded-full bg-[#B3DEE2]/40 dark:bg-[#B3DEE2]/5 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/5 blur-3xl" />
+      </div>
+      <header className="relative z-30 border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-[#17222C]/90 backdrop-blur-md sticky top-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
             <CompassLogo size={28} />
@@ -272,38 +280,48 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
         <section className="lg:col-span-5 space-y-6">
-          <p className="text-xs sm:text-sm font-medium text-[#9D2950] dark:text-[#EA9AB2]">
-            Hệ thống hỗ trợ ra quyết định hướng nghiệp cho học sinh lớp 9
-          </p>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
-            Mỗi hành trình bắt đầu từ một tài khoản của riêng em
-          </h1>
+          <div className="space-y-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFCFE3]/60 dark:bg-[#EFCFE3]/10 border border-[#EA9AB2]/70 dark:border-slate-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#9D2950] dark:text-[#EFCFE3]">
+              <Compass className="w-3.5 h-3.5" />
+              Hành trình sau lớp 9
+            </span>
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] text-[#1D242B] dark:text-white">
+              La Bàn{" "}
+              <span className="text-[#9D2950] dark:text-[#EA9AB2]">
+                Lựa Chọn
+              </span>
+            </h1>
+            <div
+              aria-hidden="true"
+              className="h-1.5 w-24 rounded-full bg-gradient-to-r from-[#E27396] via-[#EA9AB2] to-[#B3DEE2]"
+            />
+          </div>
           <blockquote className="font-editorial italic text-base sm:text-lg text-slate-700 dark:text-slate-200 bg-[#EAF2D7]/65 dark:bg-[#EAF2D7]/10 border border-[#EAF2D7] dark:border-slate-700 rounded-2xl p-5">
-            &ldquo;La bàn không đi thay người đi đường. Nó giúp em biết mình đang
-            ở đâu và nên hướng về phía nào.&rdquo;
+            &ldquo;La bàn không đi thay người đi đường. Nó giúp bạn biết mình
+            đang ở đâu và nên hướng về phía nào.&rdquo;
           </blockquote>
 
           <ul className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
             <li className="flex items-start gap-2.5">
               <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-[#133C42] dark:text-[#B3DEE2]" />
               <span>
-                Không chấm điểm, không xếp hạng. Dữ liệu của em chỉ được chia sẻ
-                theo cách em chủ động bật.
+                Không chấm điểm, không xếp hạng. Dữ liệu của bạn chỉ được chia
+                sẻ theo cách bạn chủ động bật.
               </span>
             </li>
             <li className="flex items-start gap-2.5">
               <Compass className="w-4 h-4 mt-0.5 shrink-0 text-[#9D2950] dark:text-[#EA9AB2]" />
               <span>
                 Đồng hành qua 5 bước Thu – Lọc – Thử – Chốt – Cam kết, đúng vai
-                trò của em.
+                trò của bạn.
               </span>
             </li>
             <li className="flex items-start gap-2.5">
               <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-[#4A1A2C] dark:text-[#EFCFE3]" />
               <span>
-                Trợ lí AI chỉ đặt câu hỏi gợi mở, giúp em tự viết nên lựa chọn
+                Trợ lí AI chỉ đặt câu hỏi gợi mở, giúp bạn tự viết nên lựa chọn
                 của mình.
               </span>
             </li>
@@ -368,10 +386,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4" noValidate>
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold">
-                    Chào mừng em quay lại
+                    Chào mừng quay lại
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-                    Đăng nhập để tiếp tục đúng hành trình của vai trò em đã chọn.
+                    Đăng nhập để tiếp tục hành trình đồng hành và lựa chọn của
+                    bạn.
                   </p>
                 </div>
 
@@ -440,7 +459,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       aria-describedby={
                         fieldErrors.password ? "password-error" : undefined
                       }
-                      placeholder="Nhập mật khẩu của em"
+                      placeholder="Nhập mật khẩu của bạn"
                       className={`${INPUT_CLASS} pl-10 pr-12 ${
                         fieldErrors.password
                           ? "border-rose-400 dark:border-rose-500"
@@ -479,6 +498,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   <span>{busy ? "Đang kiểm tra..." : "Đăng nhập"}</span>
                 </button>
 
+                <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">
+                  Giáo viên chủ nhiệm Lớp 9 dùng tài khoản do nhà trường cấp sẵn.
+                </p>
+
                 <p className="text-center text-sm text-slate-600 dark:text-slate-300">
                   Chưa có tài khoản?{" "}
                   <button
@@ -498,7 +521,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                     Chọn đúng vai trò để ứng dụng mở thẳng không gian làm việc
-                    phù hợp với em.
+                    phù hợp với bạn.
                   </p>
                 </div>
 
@@ -541,6 +564,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </div>
                   {renderFieldError("fullName")}
                 </div>
+
+                <p className="flex items-start gap-1.5 rounded-xl border border-[#EAF2D7] dark:border-slate-700 bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 px-3.5 py-2.5 text-xs text-[#223A1E] dark:text-[#EAF2D7]">
+                  <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Tài khoản Giáo viên chủ nhiệm Lớp 9 do nhà trường cấp sẵn; thầy/cô vui lòng chuyển sang mục{" "}
+                    <button
+                      type="button"
+                      onClick={() => switchMode("login")}
+                      className="font-semibold underline cursor-pointer"
+                    >
+                      Đăng nhập
+                    </button>{" "}
+                    để sử dụng.
+                  </span>
+                </p>
 
                 <fieldset>
                   <legend className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
@@ -588,9 +626,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <p className="flex items-start gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                       <KeyRound className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#133C42] dark:text-[#B3DEE2]" />
                       <span>
-                        Em đăng ký tài khoản học sinh Lớp 9 của riêng mình. Hệ
-                        thống tự tạo mã PIN 4 số để kết nối với ba mẹ sau khi em
-                        đăng ký; em xem và đổi mã bất cứ lúc nào trong hồ sơ của
+                        Bạn đăng ký tài khoản học sinh Lớp 9 của riêng mình. Hệ
+                        thống tự tạo mã PIN 4 số để kết nối với ba mẹ sau khi bạn
+                        đăng ký; bạn xem và đổi mã bất cứ lúc nào trong hồ sơ của
                         mình.
                       </span>
                     </p>
@@ -848,7 +886,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </section>
       </main>
 
-      <footer className="border-t border-slate-200/70 dark:border-slate-800 py-4">
+      <footer className="relative z-10 border-t border-slate-200/70 dark:border-slate-800 py-4">
         <p className="text-center text-xs text-slate-500 dark:text-slate-400 px-4">
           La Bàn Lựa Chọn · Không chấm điểm, không xếp hạng
         </p>

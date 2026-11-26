@@ -155,6 +155,54 @@ export async function requestAIQuestionStream(
   return finalResult;
 }
 
+export interface InterestProfileAnalysisParams {
+  studentCode: string;
+  mbtiType: string;
+  mbtiDetail: {
+    EI: string;
+    SN: string;
+    TF: string;
+    JP: string;
+  };
+  hollandTop: { name: string; score: number }[];
+}
+
+export interface InterestProfileAnalysisResponse {
+  personality: string;
+  interests: string;
+  environment: string;
+}
+
+export async function requestInterestProfileAnalysis(
+  params: InterestProfileAnalysisParams
+): Promise<InterestProfileAnalysisResponse> {
+  const res = await fetch("/api/ai/student/interest-profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as
+    | InterestProfileAnalysisResponse
+    | { error?: string };
+  if (!res.ok) {
+    throw new Error(
+      "error" in data && data.error
+        ? data.error
+        : `Lỗi kết nối AI (HTTP ${res.status}).`
+    );
+  }
+  const analysis = data as Partial<InterestProfileAnalysisResponse>;
+  if (!analysis.personality || !analysis.interests || !analysis.environment) {
+    throw new Error("AI trả về chưa đủ 3 khối nhận định.");
+  }
+  return {
+    personality: analysis.personality,
+    interests: analysis.interests,
+    environment: analysis.environment,
+  };
+}
+
 export interface JourneySummaryResponse {
   summary: string;
   highlights: string[];

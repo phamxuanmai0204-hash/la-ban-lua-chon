@@ -71,6 +71,9 @@ export const ProjectIntro: React.FC<ProjectIntroProps> = ({ onBack }) => {
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
             Nhiều học sinh lớp 9 đứng trước ngưỡng cửa sau THCS thường rơi vào trạng thái do dự kéo dài, ngại cam kết với một phương án đã phù hợp vì luôn nghĩ còn lựa chọn khác tốt hơn (FOBO – Fear Of Better Options). Dự án hướng tới việc trang bị cho các em một khung ra quyết định rõ ràng thay vì chỉ cung cấp thêm thông tin rời rạc.
           </p>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+            Đối tượng nghiên cứu là <strong>tất cả học sinh lớp 9 đang gặp hội chứng FOBO</strong>, không chỉ những em học lực chưa tốt đã được định hướng học nghề. Dự án đặc biệt quan tâm tới nhóm học sinh học lực ổn hoặc khá nhưng liên tục thay đổi nguyện vọng giữa các trường THPT công lập, luôn cảm thấy “còn trường khác tốt hơn” và vì thế khó chốt một lựa chọn.
+          </p>
           <div className="p-4 rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border border-[#EAF2D7] dark:border-slate-700 text-sm text-[#223A1E] dark:text-[#EAF2D7]">
             <span className="font-semibold">Cam kết giao diện học sinh &amp; phụ huynh: </span>
             Trong không gian sử dụng của học sinh và phụ huynh, ứng dụng tuyệt đối không dùng nhãn chẩn đoán tâm lí hay từ “FOBO”, không chấm điểm, không xếp hạng.
@@ -135,7 +138,7 @@ export const ProjectIntro: React.FC<ProjectIntroProps> = ({ onBack }) => {
               },
               {
                 name: "2. LỌC",
-                detail: "Đặt tiêu chí đủ tốt của riêng em và đối chiếu từng phương án.",
+                detail: "Đặt tiêu chí đủ tốt của riêng bạn và đối chiếu từng phương án.",
               },
               {
                 name: "3. THỬ",
@@ -143,7 +146,7 @@ export const ProjectIntro: React.FC<ProjectIntroProps> = ({ onBack }) => {
               },
               {
                 name: "4. CHỐT",
-                detail: "Tự đặt hạn chốt và viết lí do lựa chọn bằng ngôn từ của chính em.",
+                detail: "Tự đặt hạn chốt và viết lí do lựa chọn bằng ngôn từ của chính bạn.",
               },
               {
                 name: "5. CAM KẾT",

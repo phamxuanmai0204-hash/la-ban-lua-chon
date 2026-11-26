@@ -18,11 +18,78 @@ export type HollandGroupId =
   | "quan_li"
   | "nghiep_vu";
 
+export type InterestQuizOptionTag =
+  | "R"
+  | "I"
+  | "A"
+  | "S_holland"
+  | "E_holland"
+  | "C"
+  | "E"
+  | "I_mbti"
+  | "S_mbti"
+  | "N"
+  | "T"
+  | "F"
+  | "J"
+  | "P";
+
+export type MbtiLetter = "E" | "I" | "S" | "N" | "T" | "F" | "J" | "P";
+
+export interface InterestQuizOption {
+  key: "A" | "B";
+  text: string;
+  tag: InterestQuizOptionTag;
+}
+
+export interface InterestQuizQuestion {
+  id: string;
+  prompt: string;
+  options: [InterestQuizOption, InterestQuizOption];
+}
+
+export interface InterestQuizAnswer {
+  questionId: string;
+  choice: "A" | "B";
+  tag: InterestQuizOptionTag;
+}
+
+export interface InterestQuizScores {
+  holland: Record<HollandGroupId, number>;
+  mbti: Record<MbtiLetter, number>;
+}
+
+export interface InterestQuizAnalysis {
+  personality: string;
+  interests: string;
+  environment: string;
+  source: "ai" | "fallback";
+  generatedAt: string;
+}
+
+export interface InterestQuizResult {
+  version: 1;
+  completedAt: string;
+  answers: InterestQuizAnswer[];
+  scores: InterestQuizScores;
+  hollandTop: HollandGroupId[];
+  mbtiType: string;
+  mbtiDetail: {
+    EI: MbtiLetter;
+    SN: MbtiLetter;
+    TF: MbtiLetter;
+    JP: MbtiLetter;
+  };
+  summaryText: string;
+  analysis: InterestQuizAnalysis;
+}
+
 export interface Profile {
   abilitiesTeacherNote: string;
   abilitiesStudentSelf: string;
   hollandSelectedIds: string[];
   hollandSummaryText: string;
+  interestQuiz?: InterestQuizResult;
   conditions: {
     commuteDistance: string;
     familyFinance: string;
@@ -123,6 +190,38 @@ export interface Assessment {
   studentSelf: AssessmentLevelMap;
 }
 
+export interface StudentSummaryTryScenario {
+  pathwayTitle: string;
+  chosenPathLabels: string[];
+  reflection: string;
+  date: string;
+}
+
+export interface StudentSummaryTryActivity {
+  title: string;
+  activityType: string;
+  dateLabel: string;
+  location: string;
+  status: string;
+}
+
+export interface StudentSummaryTryJournal {
+  date: string;
+  activityType: string;
+  pathwayTitle?: string;
+  content: string;
+  reflection3Q?: JournalReflection3Q;
+}
+
+export interface StudentSummaryTryDetails {
+  scenarioReflections: StudentSummaryTryScenario[];
+  activities: StudentSummaryTryActivity[];
+  journalEntries: StudentSummaryTryJournal[];
+  reflection3QCount: number;
+  /** Đối chiếu dữ liệu THỬ với tiêu chí LỌC và lựa chọn CHỐT */
+  crossCheck: string;
+}
+
 export interface StudentSummary {
   generatedAt: string;
   sentToTeacherAt: string;
@@ -138,6 +237,14 @@ export interface StudentSummary {
     strengths: string;
     teacherNote: string;
     holland: string;
+    mbti?: string;
+    interestAnalysis?: {
+      personality: string;
+      interests: string;
+      environment: string;
+      source: "ai" | "fallback";
+      completedAt: string;
+    };
     conditions: string;
     fluctuation: string;
   };
@@ -145,6 +252,7 @@ export interface StudentSummary {
     thu: string;
     loc: string;
     thuTry: string;
+    tryDetails?: StudentSummaryTryDetails;
     chot: string;
     camKet: string;
   };
@@ -231,6 +339,7 @@ export interface Pathway {
   tuitionEstimate: string;
   admissionCutoff: string;
   imageUrl?: string;
+  imageCaption?: string;
   realStories: RealStoryLink[];
   scenario?: CareerScenario;
 }
@@ -339,7 +448,6 @@ export interface AppSettings {
   requireTeacherApprovalBeforeDisplay: boolean;
   darkMode: boolean;
   fontSize?: FontSizeScale;
-  googleFormSurveyUrl?: string;
 }
 
 export interface LinkedChild {

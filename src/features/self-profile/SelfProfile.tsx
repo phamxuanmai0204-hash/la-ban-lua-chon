@@ -1,11 +1,7 @@
 import React from "react";
-import { User, Sparkles, Home, Check } from "lucide-react";
-import {
-  HOLLAND_GROUPS,
-  HOLLAND_PROMPTS,
-  buildHollandSummary,
-} from "../../data/mockData";
+import { User, Home } from "lucide-react";
 import type { Student } from "../../types";
+import { InterestQuiz } from "./InterestQuiz";
 
 interface SelfProfileProps {
   student: Student;
@@ -19,22 +15,6 @@ export const SelfProfile: React.FC<SelfProfileProps> = ({
   onUpdateStudent,
 }) => {
   const { profile } = student;
-
-  const handleToggleHollandPrompt = (promptId: string) => {
-    const exists = profile.hollandSelectedIds.includes(promptId);
-    const nextIds = exists
-      ? profile.hollandSelectedIds.filter((id) => id !== promptId)
-      : [...profile.hollandSelectedIds, promptId];
-
-    onUpdateStudent({
-      ...student,
-      profile: {
-        ...profile,
-        hollandSelectedIds: nextIds,
-        hollandSummaryText: buildHollandSummary(nextIds),
-      },
-    });
-  };
 
   const handleConditionChange = (
     field: keyof Student["profile"]["conditions"],
@@ -127,66 +107,7 @@ export const SelfProfile: React.FC<SelfProfileProps> = ({
         </div>
       </section>
 
-      {/* Layer 2: Holland Interests */}
-      <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#EFCFE3]/70 dark:bg-[#EFCFE3]/15 flex items-center justify-center text-[#4A1A2C] dark:text-[#EFCFE3]">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold">
-              Lớp 2. Hứng thú nghề nghiệp (Gợi mở 6 nhóm sở thích)
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-              Chọn những câu mô tả đúng với em nhất. Hệ thống tóm tắt bằng lời, không tính điểm.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {HOLLAND_PROMPTS.map((item) => {
-            const checked = profile.hollandSelectedIds.includes(item.id);
-            const groupMeta = HOLLAND_GROUPS[item.group];
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleToggleHollandPrompt(item.id)}
-                className={`text-left p-4 rounded-xl border transition-colors flex items-start gap-3 min-h-[44px] cursor-pointer ${
-                  checked
-                    ? "bg-[#EFCFE3]/45 dark:bg-[#E27396]/15 border-[#E27396] text-[#1D242B] dark:text-white"
-                    : "bg-[#FAFBFD] dark:bg-[#0F171E] border-slate-200 dark:border-slate-800 hover:border-[#EA9AB2]"
-                }`}
-              >
-                <span
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                    checked
-                      ? "bg-[#E27396] border-[#E27396] text-[#1D1519]"
-                      : "border-slate-400 dark:border-slate-600"
-                  }`}
-                >
-                  {checked && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                </span>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    Nhóm {groupMeta.name}
-                  </p>
-                  <p className="text-sm leading-relaxed">{item.prompt}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border border-[#EAF2D7] dark:border-slate-700">
-          <p className="text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7] mb-1">
-            Gợi ý nhận diện từ những điều em chọn
-          </p>
-          <p className="text-sm sm:text-[15px] text-slate-800 dark:text-slate-100 leading-relaxed">
-            {profile.hollandSummaryText}
-          </p>
-        </div>
-      </section>
+      <InterestQuiz student={student} onUpdateStudent={onUpdateStudent} />
 
       {/* Layer 3: Practical Conditions */}
       <section className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">

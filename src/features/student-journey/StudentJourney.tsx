@@ -42,6 +42,7 @@ import {
   allStepsCompleted,
   buildStudentSummary,
 } from "../../utils/studentSummary";
+import { sanitizeInterestQuiz } from "../../data/interestQuiz";
 import type {
   AIMessage,
   AppSettings,
@@ -191,8 +192,16 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
 
   // AI auto-compiles the 6-part summary once every journey step is finished
   useEffect(() => {
-    if (student.summary) return;
     if (!allStepsCompleted(student)) return;
+    const quizCompletedAt = sanitizeInterestQuiz(
+      student.profile.interestQuiz
+    )?.completedAt;
+    const summaryQuizCompletedAt =
+      student.summary?.selfProfile?.interestAnalysis?.completedAt;
+    const summaryIsCurrent =
+      student.summary &&
+      (!quizCompletedAt || summaryQuizCompletedAt === quizCompletedAt);
+    if (summaryIsCurrent) return;
     const summary = buildStudentSummary(student, aiMessages, experiences);
     onUpdateStudent({
       ...student,

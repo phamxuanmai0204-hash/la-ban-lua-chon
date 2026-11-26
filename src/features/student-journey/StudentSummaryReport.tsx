@@ -1,5 +1,15 @@
 import React from "react";
-import { Bot, CheckCircle2, Send } from "lucide-react";
+import {
+  Bot,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  Compass,
+  MapPin,
+  PenLine,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import type { StudentSummary } from "../../types";
 
 interface StudentSummaryReportProps {
@@ -92,6 +102,51 @@ export const StudentSummaryReport: React.FC<StudentSummaryReportProps> = ({
           <span className="text-slate-500 dark:text-slate-400">Holland: </span>
           {summary.selfProfile.holland}
         </p>
+        {summary.selfProfile.mbti && (
+          <p>
+            <span className="text-slate-500 dark:text-slate-400">
+              Xu hướng MBTI gợi ý:{" "}
+            </span>
+            {summary.selfProfile.mbti}
+          </p>
+        )}
+        {summary.selfProfile.interestAnalysis && (
+          <div className="rounded-xl border border-[#EFCFE3] dark:border-slate-700 bg-[#FDF7FA] dark:bg-[#0F171E] p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-bold text-[#9D2950] dark:text-[#EA9AB2]">
+                Kết quả trắc nghiệm khám phá bản thân (20 câu)
+              </p>
+              <span className="px-2 py-0.5 rounded-full bg-white/80 dark:bg-[#17222C] text-[10px] font-semibold text-slate-500 dark:text-slate-300">
+                {summary.selfProfile.interestAnalysis.source === "ai"
+                  ? "AI phân tích"
+                  : "Phân tích dự phòng khi AI chưa kết nối"}
+              </span>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                1. Đặc điểm tính cách &amp; cách tư duy nổi bật (MBTI)
+              </p>
+              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                {summary.selfProfile.interestAnalysis.personality}
+              </p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                2. Nhóm sở thích &amp; hứng thú nghề nghiệp nổi trội (Holland)
+              </p>
+              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                {summary.selfProfile.interestAnalysis.interests}
+              </p>
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                3. Gợi mở môi trường học tập &amp; hướng khám phá tiếp theo
+              </p>
+              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                {summary.selfProfile.interestAnalysis.environment}
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Hoàn thành lúc: {summary.selfProfile.interestAnalysis.completedAt}
+            </p>
+          </div>
+        )}
         <p>
           <span className="text-slate-500 dark:text-slate-400">
             Điều kiện gia đình/đi lại/tự lập:{" "}
@@ -100,7 +155,9 @@ export const StudentSummaryReport: React.FC<StudentSummaryReportProps> = ({
         </p>
         <p>
           <span className="text-slate-500 dark:text-slate-400">
-            Dấu hiệu dao động/FOBO:{" "}
+            {audience === "teacher"
+              ? "Dấu hiệu dao động/FOBO: "
+              : "Dấu hiệu dao động/do dự: "}
           </span>
           {summary.selfProfile.fluctuation}
         </p>
@@ -118,10 +175,184 @@ export const StudentSummaryReport: React.FC<StudentSummaryReportProps> = ({
           <span className="font-semibold">LỌC: </span>
           {summary.steps.loc}
         </p>
-        <p>
-          <span className="font-semibold">THỬ: </span>
-          {summary.steps.thuTry}
-        </p>
+        <div className="rounded-xl border border-[#EFCFE3] bg-[#EFCFE3]/20 dark:bg-[#EFCFE3]/10 dark:border-[#EFCFE3]/40 p-3.5 space-y-3">
+          <p>
+            <span className="font-semibold">THỬ: </span>
+            {summary.steps.thuTry}
+          </p>
+
+          {summary.steps.tryDetails && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-white/80 dark:bg-[#17222C] border border-slate-200/70 dark:border-slate-800 p-3 space-y-2">
+                <p className="text-[11px] font-bold text-[#4A1A2C] dark:text-[#EFCFE3] flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5" />
+                  1. Thử một ngày theo lộ trình
+                </p>
+                {summary.steps.tryDetails.scenarioReflections.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                    Chưa lưu câu trả lời nào từ phần thử lộ trình.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {summary.steps.tryDetails.scenarioReflections.map(
+                      (item, idx) => (
+                        <article
+                          key={`${item.pathwayTitle}-${item.date}-${idx}`}
+                          className="rounded-lg border border-slate-200/70 dark:border-slate-800 bg-[#FAFBFD] dark:bg-[#0F171E] p-2.5 space-y-1.5 text-xs sm:text-sm"
+                        >
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                              {item.pathwayTitle}
+                            </span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                              {item.date}
+                            </span>
+                          </div>
+                          {item.chosenPathLabels.length > 0 && (
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                              Lựa chọn trong tình huống:{" "}
+                              {item.chosenPathLabels.join(" → ")}
+                            </p>
+                          )}
+                          <p className="leading-relaxed whitespace-pre-line">
+                            {item.reflection || "—"}
+                          </p>
+                        </article>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-white/80 dark:bg-[#17222C] border border-slate-200/70 dark:border-slate-800 p-3 space-y-2">
+                <p className="text-[11px] font-bold text-[#4A1A2C] dark:text-[#EFCFE3] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  2. Hoạt động nhà trường đã đăng kí
+                </p>
+                {summary.steps.tryDetails.activities.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                    Em chưa đăng kí hoạt động trải nghiệm nào do nhà trường tổ
+                    chức.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {summary.steps.tryDetails.activities.map(
+                      (activity, idx) => (
+                        <article
+                          key={`${activity.title}-${idx}`}
+                          className="rounded-lg border border-slate-200/70 dark:border-slate-800 bg-[#FAFBFD] dark:bg-[#0F171E] p-2.5 space-y-1.5 text-xs sm:text-sm"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-bold">{activity.title}</p>
+                              <p className="text-[11px] text-[#9D2950] dark:text-[#EA9AB2]">
+                                {activity.activityType}
+                              </p>
+                            </div>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF2D7] text-[#223A1E] px-2 py-0.5 text-[10px] font-bold shrink-0">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {activity.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                            <span className="inline-flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {activity.dateLabel}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {activity.location}
+                            </span>
+                          </div>
+                        </article>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-white/80 dark:bg-[#17222C] border border-slate-200/70 dark:border-slate-800 p-3 space-y-2">
+                <p className="text-[11px] font-bold text-[#4A1A2C] dark:text-[#EFCFE3] flex items-center gap-1.5">
+                  <PenLine className="w-3.5 h-3.5" />
+                  3. Nhật ký thông minh &amp; Phiếu cảm nhận 3 câu
+                </p>
+                {summary.steps.tryDetails.journalEntries.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 italic inline-flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Chưa có nhật ký nào ở bước THỬ.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {summary.steps.tryDetails.journalEntries.map(
+                      (entry, idx) => (
+                        <article
+                          key={`${entry.date}-${idx}`}
+                          className="rounded-lg border border-slate-200/70 dark:border-slate-800 bg-[#FAFBFD] dark:bg-[#0F171E] p-2.5 space-y-1.5 text-xs sm:text-sm"
+                        >
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="font-semibold text-[#4A1A2C] dark:text-[#EFCFE3]">
+                              {entry.activityType}
+                            </span>
+                            {entry.pathwayTitle && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span>{entry.pathwayTitle}</span>
+                              </>
+                            )}
+                            <span aria-hidden="true">·</span>
+                            <span className="tabular-nums">{entry.date}</span>
+                          </div>
+
+                          {entry.reflection3Q ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="rounded-lg bg-white dark:bg-[#17222C] border border-slate-200/60 dark:border-slate-800 p-2">
+                                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  Em thấy gì
+                                </p>
+                                <p className="mt-0.5 leading-relaxed whitespace-pre-line">
+                                  {entry.reflection3Q.saw || "—"}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-white dark:bg-[#17222C] border border-slate-200/60 dark:border-slate-800 p-2">
+                                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  Em cảm thấy thế nào
+                                </p>
+                                <p className="mt-0.5 leading-relaxed whitespace-pre-line">
+                                  {entry.reflection3Q.felt || "—"}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-white dark:bg-[#17222C] border border-slate-200/60 dark:border-slate-800 p-2">
+                                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                  Điều đó có thay đổi suy nghĩ không
+                                </p>
+                                <p className="mt-0.5 leading-relaxed whitespace-pre-line">
+                                  {entry.reflection3Q.changedMind || "—"}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="leading-relaxed whitespace-pre-line">
+                              {entry.content}
+                            </p>
+                          )}
+                        </article>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-[#EFCFE3]/45 dark:bg-[#EFCFE3]/10 border border-[#EA9AB2]/70 dark:border-[#EA9AB2]/40 p-2.5 text-xs sm:text-sm">
+                <p className="font-semibold text-[#4A1A2C] dark:text-[#EFCFE3]">
+                  Đối chiếu THỬ với LỌC &amp; CHỐT
+                </p>
+                <p className="mt-0.5 leading-relaxed">
+                  {summary.steps.tryDetails.crossCheck}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
         <p>
           <span className="font-semibold">CHỐT: </span>
           {summary.steps.chot}

@@ -945,7 +945,7 @@ export const TryAndJournal: React.FC<TryAndJournalProps> = ({
                   rows={3}
                   value={qChanged}
                   onChange={(e) => setQChanged(e.target.value)}
-                  placeholder="Ví dụ: Em không còn nghĩ học nghề là hết đường học lên nữa..."
+                  placeholder="Ví dụ: Em không còn nghĩ phải chọn đúng ngôi trường 'tốt nhất' ngay từ đầu nữa..."
                   className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 text-sm"
                 />
               </div>

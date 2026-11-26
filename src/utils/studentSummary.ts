@@ -1,3 +1,6 @@
+import { HOLLAND_GROUPS } from "../data/hollandGroups";
+import { sanitizeInterestQuiz } from "../data/interestQuiz";
+import { HOMEROOM_TEACHER_USERNAME } from "../services/authValidation";
 import type {
   AIMessage,
   AssessmentLevelMap,
@@ -111,6 +114,15 @@ export function buildStudentSummary(
   const archivedOptions = student.consideredOptions.filter(
     (o) => o.status === "Tạm gác lại"
   );
+  const interestQuiz = sanitizeInterestQuiz(student.profile.interestQuiz);
+  const interestHollandGroups = interestQuiz
+    ? interestQuiz.hollandTop
+        .map(
+          (id) =>
+            `${HOLLAND_GROUPS[id].name} (${interestQuiz.scores.holland[id]} điểm)`
+        )
+        .join(", ")
+    : "";
 
   const criteria = student.criteria.map((c) => c.label);
   const evaluations = activeOptions.map((opt) => {
@@ -126,17 +138,133 @@ export function buildStudentSummary(
     return `${opt.title} (${opt.status}): ${match} đáp ứng, ${missing} chưa đáp ứng, ${unclear} chưa rõ`;
   });
 
-  const joinedExperiences = experiences
-    .filter((exp) => student.joinedExperienceIds.includes(exp.id))
-    .map((exp) => `${exp.title} – ${exp.activityType}`);
+  const joinedExperienceRecords = experiences.filter((exp) =>
+    student.joinedExperienceIds.includes(exp.id)
+  );
+  const joinedExperiences = joinedExperienceRecords.map(
+    (exp) => `${exp.title} – ${exp.activityType}`
+  );
+
+  const tryScenarioReflections = (student.scenarioReflections ?? []).map(
+    (item) => ({
+      pathwayTitle: item.pathwayTitle,
+      chosenPathLabels: item.chosenPathLabels,
+      reflection: item.reflection.trim(),
+      date: item.date,
+    })
+  );
 
   const tryJournalEntries = student.journal.filter(
-    (entry) => (entry.step || "THỬ") === "THỬ"
+    (entry) =>
+      (entry.step || "THỬ") === "THỬ" && !entry.id.startsWith("j-sc-")
   );
-  const latestTryReflection =
-    student.scenarioReflections?.[0]?.reflection ||
-    tryJournalEntries[0]?.content ||
-    "";
+  const tryReflection3QCount = tryJournalEntries.filter(
+    (entry) => Boolean(entry.reflection3Q)
+  ).length;
+
+  const chosenOptionTitle = student.commitment.chosenOption.trim();
+  const chosenOption =
+    student.consideredOptions.find((opt) => opt.status === "Đã chọn") ??
+    student.consideredOptions.find(
+      (opt) => opt.title.trim() === chosenOptionTitle
+    ) ??
+    null;
+  const optionTitleByPathwayId = new Map(
+    student.consideredOptions
+      .filter((opt) => opt.pathwayId !== "custom")
+      .map((opt) => [opt.pathwayId, opt.title])
+  );
+  const triedPathwayTitles = Array.from(
+    new Set(
+      [
+        ...tryScenarioReflections.map((item) => item.pathwayTitle),
+        ...tryJournalEntries.map((item) => item.pathwayTitle ?? ""),
+        ...joinedExperienceRecords.map(
+          (item) => optionTitleByPathwayId.get(item.pathwayId ?? "") ?? ""
+        ),
+      ].filter(Boolean)
+    )
+  );
+  const normalizeTitle = (value: string) =>
+    value.toLocaleLowerCase("vi").trim();
+  const chosenMatchesTry =
+    Boolean(chosenOptionTitle) &&
+    triedPathwayTitles.some((title) => {
+      const normalized = normalizeTitle(title);
+      const chosen = normalizeTitle(chosenOptionTitle);
+      return (
+        normalized === chosen ||
+        normalized.includes(chosen) ||
+        chosen.includes(normalized)
+      );
+    });
+  const chosenPathwayActivityCount = chosenOption
+    ? joinedExperienceRecords.filter(
+        (item) => item.pathwayId === chosenOption.pathwayId
+      ).length
+    : 0;
+
+  const tryCrossCheck = (() => {
+    if (
+      tryScenarioReflections.length === 0 &&
+      joinedExperienceRecords.length === 0 &&
+      tryJournalEntries.length === 0
+    ) {
+      return "Chưa có dữ liệu chặng THỬ để đối chiếu với bước LỌC và CHỐT.";
+    }
+
+    const parts = [
+      `Đã đối chiếu ${tryScenarioReflections.length} lần thử lộ trình, ${joinedExperienceRecords.length} hoạt động nhà trường đã đăng kí và ${tryJournalEntries.length} nhật ký (${tryReflection3QCount} phiếu cảm nhận 3 câu) với bước LỌC và CHỐT.`,
+    ];
+
+    if (criteria.length === 0) {
+      parts.push(
+        "Bước LỌC chưa có tiêu chí nào nên chưa thể kiểm tra trải nghiệm thử có đúng điều em coi trọng hay không."
+      );
+    } else {
+      parts.push(
+        `Bước LỌC đã có ${criteria.length} tiêu chí để làm mốc so sánh với cảm nhận sau trải nghiệm.`
+      );
+    }
+
+    if (!chosenOptionTitle) {
+      parts.push(
+        "Bước CHỐT chưa có lựa chọn cuối nên chưa xác định được mức khớp giữa THỬ và quyết định."
+      );
+    } else if (triedPathwayTitles.length === 0) {
+      parts.push(
+        `Dữ liệu THỬ chưa gắn với lộ trình cụ thể nên chưa đối chiếu trực tiếp được với lựa chọn cuối “${chosenOptionTitle}”.`
+      );
+    } else if (chosenMatchesTry) {
+      parts.push(
+        `Các trải nghiệm thử (${triedPathwayTitles.join(
+          ", "
+        )}) trùng với lựa chọn cuối “${chosenOptionTitle}”, cho thấy em đã trải nghiệm đúng hướng trước khi chốt.`
+      );
+    } else {
+      parts.push(
+        `Các trải nghiệm thử (${triedPathwayTitles.join(
+          ", "
+        )}) chưa trùng với lựa chọn cuối “${chosenOptionTitle}” – cần trao đổi thêm để hiểu vì sao em chuyển hướng sau trải nghiệm.`
+      );
+    }
+
+    if (joinedExperienceRecords.length > 0) {
+      parts.push(
+        chosenPathwayActivityCount > 0
+          ? `Có ${chosenPathwayActivityCount} hoạt động thực tế gắn trực tiếp với lộ trình em chốt.`
+          : "Các hoạt động đã đăng kí chưa gắn trực tiếp với lộ trình em chốt, nên đối chiếu thêm với cảm nhận của em."
+      );
+    }
+
+    if (tryReflection3QCount > 0) {
+      parts.push(
+        `${tryReflection3QCount} phiếu cảm nhận 3 câu có ghi nhận mức độ thay đổi suy nghĩ sau trải nghiệm.`
+      );
+    }
+
+    return parts.join(" ");
+  })();
 
   const actionPlan = student.commitment.actionPlan.map((task) => {
     const due = task.dueDate ? ` (hạn ${task.dueDate})` : "";
@@ -169,7 +297,7 @@ export function buildStudentSummary(
       fullName: student.fullName,
       className: "Lớp 9",
       parentContact: `Phụ huynh của ${student.fullName} (liên kết qua mã PIN)`,
-      teacherContact: "Giáo viên phụ trách Lớp 9",
+      teacherContact: `Cô Thủy — giáo viên chủ nhiệm Lớp 9 (tài khoản ${HOMEROOM_TEACHER_USERNAME})`,
       completedAt: now,
     },
     selfProfile: {
@@ -181,10 +309,24 @@ export function buildStudentSummary(
         [student.profile.abilitiesTeacherNote],
         "Giáo viên chưa ghi lưu ý."
       ),
-      holland: joinNonEmpty(
-        [student.profile.hollandSummaryText],
-        "Chưa có kết quả Holland."
-      ),
+      holland: interestQuiz
+        ? interestHollandGroups
+        : joinNonEmpty(
+            [student.profile.hollandSummaryText],
+            "Chưa có kết quả Holland."
+          ),
+      ...(interestQuiz
+        ? {
+            mbti: interestQuiz.mbtiType,
+            interestAnalysis: {
+              personality: interestQuiz.analysis.personality,
+              interests: interestQuiz.analysis.interests,
+              environment: interestQuiz.analysis.environment,
+              source: interestQuiz.analysis.source,
+              completedAt: interestQuiz.completedAt,
+            },
+          }
+        : {}),
       conditions: joinNonEmpty(
         [
           student.profile.conditions.commuteDistance
@@ -229,18 +371,37 @@ export function buildStudentSummary(
       ),
       thuTry: joinNonEmpty(
         [
+          tryScenarioReflections.length > 0
+            ? `Thử một ngày theo lộ trình: ${triedPathwayTitles.join(", ")}`
+            : "",
           joinedExperiences.length > 0
-            ? `Hoạt động đã tham gia: ${joinedExperiences.join(", ")}`
+            ? `Hoạt động nhà trường đã đăng kí: ${joinedExperiences.join(", ")}`
             : "",
           tryJournalEntries.length > 0
-            ? `Đã ghi ${tryJournalEntries.length} nhật ký ở bước THỬ`
-            : "",
-          latestTryReflection
-            ? `Cảm nhận cốt lõi: ${truncate(latestTryReflection)}`
+            ? `${tryJournalEntries.length} nhật ký ở bước THỬ, trong đó ${tryReflection3QCount} phiếu cảm nhận 3 câu`
             : "",
         ],
         "Chưa ghi nhận hoạt động trải nghiệm."
       ),
+      tryDetails: {
+        scenarioReflections: tryScenarioReflections,
+        activities: joinedExperienceRecords.map((item) => ({
+          title: item.title,
+          activityType: item.activityType,
+          dateLabel: item.dateLabel,
+          location: item.location,
+          status: "Đã đăng kí / tham gia",
+        })),
+        journalEntries: tryJournalEntries.map((entry) => ({
+          date: entry.date,
+          activityType: entry.activityType,
+          pathwayTitle: entry.pathwayTitle,
+          content: entry.content,
+          reflection3Q: entry.reflection3Q,
+        })),
+        reflection3QCount: tryReflection3QCount,
+        crossCheck: tryCrossCheck,
+      },
       chot: joinNonEmpty(
         [
           student.commitment.chosenOption
@@ -287,10 +448,10 @@ export function buildStudentSummary(
     ),
     readiness: `${readinessLevel(student)} Tự đánh giá hiện tại — ${describeAssessment(
       student.assessment.studentSelf
-    )}.`,
+    )}. Đối chiếu THỬ – LỌC – CHỐT: ${tryCrossCheck}`,
     sendStatus: joinNonEmpty(
       [
-        `Đã gửi tới tài khoản giáo viên phụ trách lúc ${now}`,
+        `Đã gửi tới tài khoản giáo viên chủ nhiệm ${HOMEROOM_TEACHER_USERNAME} lúc ${now}`,
         sentToParentAt
           ? `Đã gửi tới tài khoản phụ huynh lúc ${sentToParentAt}`
           : "Chưa gửi phụ huynh vì em đang tắt chia sẻ hồ sơ",

@@ -5,7 +5,6 @@ import {
   X,
   Cloud,
   HardDrive,
-  ClipboardList,
   ShieldCheck,
   RotateCcw,
   Download,
@@ -26,10 +25,8 @@ interface SettingsModalProps {
   appState: AppState;
   activeStorageKind: "local" | "firebase";
   schemaVersion: number;
-  googleFormSurveyUrl?: string;
   requireTeacherApprovalBeforeDisplay: boolean;
   onToggleRequireApproval: () => void;
-  onUpdateGoogleFormSurveyUrl?: (url: string) => void;
   onResetSampleData: () => void;
   onImportFullAppState: (nextState: AppState) => void;
   onClose: () => void;
@@ -44,10 +41,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   appState,
   activeStorageKind,
   schemaVersion,
-  googleFormSurveyUrl = "",
   requireTeacherApprovalBeforeDisplay,
   onToggleRequireApproval,
-  onUpdateGoogleFormSurveyUrl,
   onResetSampleData,
   onImportFullAppState,
   onClose,
@@ -57,7 +52,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [configJson, setConfigJson] = useState<string>(
     saved.config ? JSON.stringify(saved.config, null, 2) : ""
   );
-  const [surveyUrlDraft, setSurveyUrlDraft] = useState(googleFormSurveyUrl);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -65,28 +59,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setSurveyUrlDraft(googleFormSurveyUrl || "");
     setConfirmReset(false);
-  }, [googleFormSurveyUrl, open]);
+  }, [open]);
 
   if (!open) return null;
-
-  const handleSaveSurveyUrl = () => {
-    setErrorMessage(null);
-    const trimmed = surveyUrlDraft.trim();
-    if (trimmed && !/^https?:\/\//i.test(trimmed)) {
-      setErrorMessage(
-        "Liên kết Google Form cần bắt đầu bằng http:// hoặc https://."
-      );
-      return;
-    }
-    onUpdateGoogleFormSurveyUrl?.(trimmed);
-    setStatusMessage(
-      trimmed
-        ? "Đã lưu liên kết phiếu khảo sát Google Form."
-        : "Đã xóa liên kết phiếu khảo sát Google Form."
-    );
-  };
 
   const handleEnableFirebase = async () => {
     setErrorMessage(null);
@@ -248,37 +224,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             {requireTeacherApprovalBeforeDisplay ? "Đang bật" : "Đang tắt"}
           </button>
-        </div>
-
-        {/* 4.4 Item 2: Google Form Survey Link */}
-        <div className="p-4 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 space-y-2.5">
-          <label
-            htmlFor="google-form-survey-url"
-            className="text-sm font-semibold flex items-center gap-2"
-          >
-            <ClipboardList className="w-4 h-4 text-[#9D2950] dark:text-[#EA9AB2]" />
-            <span>Liên kết Google Form khảo sát (chế độ Nghiên cứu)</span>
-          </label>
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            Dán đường dẫn Google Form của đề tài để nút &ldquo;Phiếu khảo sát Google Form&rdquo; trong trang Nghiên cứu mở trực tiếp.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              id="google-form-survey-url"
-              type="url"
-              value={surveyUrlDraft}
-              onChange={(e) => setSurveyUrlDraft(e.target.value)}
-              placeholder="https://docs.google.com/forms/d/..."
-              className="flex-1 min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] px-3 py-2 text-xs sm:text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleSaveSurveyUrl}
-              className="min-h-[42px] px-4 py-2 rounded-xl bg-[#B3DEE2] hover:bg-[#9FD3D8] text-[#133C42] text-xs sm:text-sm font-semibold shrink-0 cursor-pointer"
-            >
-              Lưu liên kết
-            </button>
-          </div>
         </div>
 
         {/* 4.4 Item 4 & 5: Xuất / nhập toàn bộ dữ liệu + Khôi phục dữ liệu mẫu */}

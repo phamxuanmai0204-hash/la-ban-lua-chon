@@ -7,6 +7,10 @@ import type {
   Role,
 } from "../types";
 import {
+  formatFullNameError,
+  formatPasswordError,
+  formatPinError,
+  formatUsernameError,
   normalizeUsername,
   usernameKey,
   validateLoginInput,
@@ -26,6 +30,7 @@ const AUTH_SESSION_KEY = "la_ban_v2:auth_session";
 const AUTH_ACCOUNTS_KEY = "la_ban_v2:auth_accounts";
 const API_BASE = "/api/auth";
 const SCHOOL_API_BASE = "/api/school";
+const STUDENT_ACCOUNTS_API_BASE = "/api/school/student-accounts";
 const REQUEST_TIMEOUT_MS = 8000;
 const PBKDF2_ITERATIONS = 150000;
 const PIN_PATTERN = /^\d{4}$/;
@@ -66,6 +71,41 @@ class AuthNetworkError extends Error {}
 export interface AuthResult {
   session: AuthSession;
   /** true when the account could not be stored on the server and is kept on this device only */
+  savedOffline: boolean;
+}
+
+export interface StudentAccountLinkedParent {
+  id: string;
+  fullName: string;
+  username: string;
+}
+
+export interface StudentAccountSummary {
+  id: string;
+  fullName: string;
+  username: string;
+  className: string;
+  parentPin: string;
+  createdAt: string;
+  linkedParents: StudentAccountLinkedParent[];
+}
+
+export interface CreateStudentAccountInput {
+  fullName: string;
+  username: string;
+  password: string;
+  parentPin?: string;
+}
+
+export interface UpdateStudentAccountInput {
+  fullName: string;
+  username: string;
+  parentPin?: string;
+  newPassword?: string;
+}
+
+export interface StudentAccountResult {
+  account: StudentAccountSummary;
   savedOffline: boolean;
 }
 
@@ -375,6 +415,372 @@ export async function fetchSchoolRoster(): Promise<SchoolRoster> {
   } catch {
     return buildLocalRoster();
   }
+}
+
+function toLocalStudentAccountSummary(
+  account: LocalAccountRecord,
+  accounts: LocalAccountRecord[]
+): StudentAccountSummary {
+  const studentCode = `acc:${account.id}`;
+  return {
+    id: account.id,
+    fullName: account.fullName,
+    username: account.username,
+    className: DEFAULT_CLASS_ID,
+    parentPin: account.parentPin ?? "",
+    createdAt: account.createdAt,
+    linkedParents: accounts
+      .filter(
+        (item) =>
+          item.role === "parent" &&
+          (item.linkedChildren ?? []).some(
+            (child) => child.studentId === studentCode
+          )
+      )
+      .map((parent) => ({
+        id: parent.id,
+        fullName: parent.fullName,
+        username: parent.username,
+      })),
+  };
+}
+
+function readLocalStudentAccounts(): StudentAccountSummary[] {
+  const accounts = readLocalAccounts();
+  return accounts
+    .filter((account) => account.role === "student")
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"))
+    .map((account) => toLocalStudentAccountSummary(account, accounts));
+}
+
+function assertTeacherSession(session: AuthSession): void {
+  if (session.user.role !== "teacher") {
+    throw new AuthError(
+      "Chỉ tài khoản Giáo viên mới quản lý được danh sách tài khoản học sinh.",
+      { code: "FORBIDDEN" }
+    );
+  }
+}
+
+function validateStudentNameAndUsername(input: {
+  fullName: string;
+  username: string;
+}): { fullName: string; username: string } {
+  const fullName = input.fullName.trim();
+  const username = normalizeUsername(input.username);
+  const fullNameError = formatFullNameError(fullName);
+  if (fullNameError) {
+    throw new AuthError(fullNameError, {
+      code: "INVALID_INPUT",
+      field: "fullName",
+    });
+  }
+  const usernameError = formatUsernameError(username);
+  if (usernameError) {
+    throw new AuthError(usernameError, {
+      code: "INVALID_INPUT",
+      field: "username",
+    });
+  }
+  return { fullName, username };
+}
+
+function validateOptionalPin(pin: string | undefined): string {
+  const clean = (pin ?? "").trim();
+  if (!clean) return "";
+  const pinError = formatPinError(clean);
+  if (pinError) {
+    throw new AuthError(pinError, {
+      code: "INVALID_INPUT",
+      field: "parentPin",
+    });
+  }
+  return clean;
+}
+
+function validatePassword(password: string): string {
+  const passwordError = formatPasswordError(password);
+  if (passwordError) {
+    throw new AuthError(passwordError, {
+      code: "INVALID_INPUT",
+      field: "password",
+    });
+  }
+  return password;
+}
+
+async function updateLocalStudentAccount(
+  accountId: string,
+  input: {
+    fullName: string;
+    username: string;
+    parentPin?: string;
+    newPassword?: string;
+  }
+): Promise<StudentAccountSummary | null> {
+  const accounts = readLocalAccounts();
+  const target = accounts.find(
+    (account) => account.id === accountId && account.role === "student"
+  );
+  if (!target) return null;
+
+  let updated: LocalAccountRecord = {
+    ...target,
+    fullName: input.fullName,
+    username: input.username,
+    usernameKey: usernameKey(input.username),
+    parentPin: input.parentPin || target.parentPin,
+  };
+
+  if (input.newPassword) {
+    const salt = randomHex(16);
+    updated = {
+      ...updated,
+      salt,
+      passwordHash: await hashPassword(input.newPassword, salt),
+    };
+  }
+
+  const studentCode = `acc:${updated.id}`;
+  const nextAccounts = accounts.map((account) => {
+    if (account.id === updated.id) return updated;
+    if (account.role === "parent") {
+      const linked = account.linkedChildren ?? [];
+      if (linked.some((child) => child.studentId === studentCode)) {
+        return {
+          ...account,
+          linkedChildren: linked.map((child) =>
+            child.studentId === studentCode
+              ? { ...child, displayName: updated.fullName }
+              : child
+          ),
+        };
+      }
+    }
+    return account;
+  });
+
+  writeLocalAccounts(nextAccounts);
+  return toLocalStudentAccountSummary(updated, nextAccounts);
+}
+
+function removeLocalStudentAccount(accountId: string): void {
+  const accounts = readLocalAccounts();
+  const studentCode = `acc:${accountId}`;
+  const nextAccounts = accounts
+    .filter((account) => account.id !== accountId)
+    .map((account) => {
+      if (account.role !== "parent") return account;
+      const linked = account.linkedChildren ?? [];
+      if (!linked.some((child) => child.studentId === studentCode)) {
+        return account;
+      }
+      return {
+        ...account,
+        linkedChildren: linked.filter(
+          (child) => child.studentId !== studentCode
+        ),
+      };
+    });
+  writeLocalAccounts(nextAccounts);
+}
+
+export async function listStudentAccounts(
+  session: AuthSession
+): Promise<StudentAccountSummary[]> {
+  assertTeacherSession(session);
+
+  if (isOnline() && !session.token.startsWith("local-")) {
+    try {
+      const payload = await apiRequest<{ accounts?: StudentAccountSummary[] }>(
+        "",
+        {
+          method: "GET",
+          token: session.token,
+          base: STUDENT_ACCOUNTS_API_BASE,
+        }
+      );
+      if (payload && Array.isArray(payload.accounts)) {
+        return payload.accounts;
+      }
+      throw new AuthNetworkError("Danh sách tài khoản không hợp lệ.");
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+    }
+  }
+
+  return readLocalStudentAccounts();
+}
+
+export async function createStudentAccount(
+  session: AuthSession,
+  input: CreateStudentAccountInput
+): Promise<StudentAccountResult> {
+  assertTeacherSession(session);
+  const { fullName, username } = validateStudentNameAndUsername(input);
+  const password = validatePassword(input.password);
+  const parentPin = validateOptionalPin(input.parentPin);
+
+  if (isOnline() && !session.token.startsWith("local-")) {
+    try {
+      const payload = await apiRequest<{ account?: StudentAccountSummary }>(
+        "",
+        {
+          method: "POST",
+          token: session.token,
+          base: STUDENT_ACCOUNTS_API_BASE,
+          body: { fullName, username, password, parentPin },
+        }
+      );
+      if (payload?.account) {
+        const account = payload.account;
+        await upsertLocalAccount(
+          {
+            fullName: account.fullName,
+            role: "student",
+            username: account.username,
+            password,
+            className: account.className,
+            parentPin: account.parentPin,
+          },
+          {
+            id: account.id,
+            fullName: account.fullName,
+            role: "student",
+            username: account.username,
+            createdAt: account.createdAt,
+            className: account.className,
+            parentPin: account.parentPin,
+          }
+        );
+        return { account, savedOffline: false };
+      }
+      throw new AuthNetworkError("Phản hồi tạo tài khoản không hợp lệ.");
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+    }
+  }
+
+  const accounts = readLocalAccounts();
+  const key = usernameKey(username);
+  if (accounts.some((account) => account.usernameKey === key)) {
+    throw new AuthError(
+      "Tên đăng nhập hoặc email này đã được dùng trên thiết bị. Vui lòng chọn tên khác.",
+      { code: "USERNAME_TAKEN", field: "username" }
+    );
+  }
+
+  const salt = randomHex(16);
+  const passwordHash = await hashPassword(password, salt);
+  const record: LocalAccountRecord = {
+    id: `local-${randomHex(12)}`,
+    fullName,
+    role: "student",
+    username,
+    usernameKey: key,
+    passwordHash,
+    salt,
+    createdAt: new Date().toISOString(),
+    className: DEFAULT_CLASS_ID,
+    parentPin: parentPin || generateParentPin(),
+  };
+  const nextAccounts = [...accounts, record];
+  writeLocalAccounts(nextAccounts);
+
+  return {
+    account: toLocalStudentAccountSummary(record, nextAccounts),
+    savedOffline: true,
+  };
+}
+
+export async function updateStudentAccount(
+  session: AuthSession,
+  accountId: string,
+  input: UpdateStudentAccountInput
+): Promise<StudentAccountResult> {
+  assertTeacherSession(session);
+  const { fullName, username } = validateStudentNameAndUsername(input);
+  const parentPin = validateOptionalPin(input.parentPin);
+  const newPassword = input.newPassword?.trim()
+    ? validatePassword(input.newPassword)
+    : "";
+
+  const canUseServer =
+    isOnline() &&
+    !session.token.startsWith("local-") &&
+    !accountId.startsWith("local-");
+
+  if (canUseServer) {
+    try {
+      const payload = await apiRequest<{ account?: StudentAccountSummary }>(
+        `/${encodeURIComponent(accountId)}/update`,
+        {
+          method: "POST",
+          token: session.token,
+          base: STUDENT_ACCOUNTS_API_BASE,
+          body: { fullName, username, parentPin, newPassword },
+        }
+      );
+      if (payload?.account) {
+        await updateLocalStudentAccount(accountId, {
+          fullName,
+          username,
+          parentPin,
+          newPassword: newPassword || undefined,
+        });
+        return { account: payload.account, savedOffline: false };
+      }
+      throw new AuthNetworkError("Phản hồi cập nhật tài khoản không hợp lệ.");
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+    }
+  }
+
+  const updated = await updateLocalStudentAccount(accountId, {
+    fullName,
+    username,
+    parentPin,
+    newPassword: newPassword || undefined,
+  });
+  if (!updated) {
+    throw new AuthError(
+      "Chưa kết nối được máy chủ nên không thể chỉnh sửa tài khoản này. Vui lòng kiểm tra mạng rồi thử lại.",
+      { code: "AUTH_UNAVAILABLE", field: "form" }
+    );
+  }
+  return { account: updated, savedOffline: true };
+}
+
+export async function deleteStudentAccount(
+  session: AuthSession,
+  accountId: string
+): Promise<void> {
+  assertTeacherSession(session);
+
+  const canUseServer =
+    isOnline() &&
+    !session.token.startsWith("local-") &&
+    !accountId.startsWith("local-");
+
+  if (canUseServer) {
+    try {
+      await apiRequest(`/${encodeURIComponent(accountId)}/delete`, {
+        method: "POST",
+        token: session.token,
+        base: STUDENT_ACCOUNTS_API_BASE,
+      });
+      removeLocalStudentAccount(accountId);
+      return;
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+    }
+    throw new AuthError(
+      "Chưa kết nối được máy chủ nên chưa thể xóa tài khoản. Vui lòng kiểm tra mạng rồi thử lại.",
+      { code: "AUTH_UNAVAILABLE", field: "form" }
+    );
+  }
+
+  removeLocalStudentAccount(accountId);
 }
 
 interface LocalLinkTarget {

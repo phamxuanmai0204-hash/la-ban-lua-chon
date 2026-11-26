@@ -281,7 +281,8 @@ async function startServer() {
   app.use(express.json({ limit: "1mb" }));
 
   // 0. Account registration and sign-in (local JSON store, ready to swap for a cloud DB)
-  registerAuthRoutes(app);
+  //    Also seeds the single fixed homeroom teacher account CoThuy912.
+  await registerAuthRoutes(app);
 
   // 1. Standard JSON AI question endpoint (with Layer 1 + Anonymization + Schema + Layer 2)
   app.post("/api/ai/question", async (req, res) => {
@@ -679,6 +680,107 @@ Yêu cầu:
       });
     } catch (err) {
       console.error("Gemini /api/ai/teacher/thematic-coding error:", err);
+      const formatted = formatGeminiError(err);
+      res.status(formatted.status).json({ error: formatted.message });
+    }
+  });
+
+  // 6. Student AI Tool: "Phân tích khám phá bản thân" (Holland + MBTI)
+  app.post("/api/ai/student/interest-profile", async (req, res) => {
+    const ai = getGeminiClient();
+    if (!ai) {
+      res.status(503).json({
+        error:
+          "Chưa cấu hình GEMINI_API_KEY trên máy chủ. Vui lòng kiểm tra khóa trong Settings > Secrets.",
+      });
+      return;
+    }
+
+    const body = (req.body || {}) as {
+      studentCode?: string;
+      mbtiType?: string;
+      mbtiDetail?: {
+        EI?: string;
+        SN?: string;
+        TF?: string;
+        JP?: string;
+      };
+      hollandTop?: { name?: string; score?: number }[];
+    };
+
+    const hollandTop = Array.isArray(body.hollandTop)
+      ? body.hollandTop
+          .filter((item) => item && typeof item.name === "string")
+          .slice(0, 3)
+          .map((item) => ({
+            name: String(item.name),
+            score: Number(item.score) || 0,
+          }))
+      : [];
+
+    if (hollandTop.length === 0) {
+      res.status(400).json({
+        error: "Chưa có kết quả Holland để phân tích. Vui lòng hoàn thành đủ 20 câu.",
+      });
+      return;
+    }
+
+    const code = (body.studentCode || "HS Ẩn danh").trim();
+    const detail = body.mbtiDetail || {};
+    const prompt = [
+      `Kết quả trắc nghiệm khám phá bản thân của học sinh ${anDanhHoa(code, code)}:`,
+      `- Xu hướng MBTI gợi ý: ${body.mbtiType || "Chưa rõ"}`,
+      `- Hướng năng lượng: ${detail.EI || "Chưa rõ"}`,
+      `- Cách tiếp nhận thông tin: ${detail.SN || "Chưa rõ"}`,
+      `- Cách ra quyết định: ${detail.TF || "Chưa rõ"}`,
+      `- Cách sắp xếp công việc: ${detail.JP || "Chưa rõ"}`,
+      `- Nhóm hứng thú Holland nổi trội: ${hollandTop
+        .map((item) => `${item.name} (${item.score} điểm)`)
+        .join(", ")}`,
+    ].join("\n");
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: prompt,
+        config: {
+          systemInstruction: `Bạn là trợ lí hướng nghiệp cho học sinh lớp 9 trong ứng dụng La Bàn Lựa Chọn. Hãy viết 3 khối nhận định bằng tiếng Việt, giữ tinh thần gợi mở, giúp em tự khám phá.
+Yêu cầu:
+- personality: 3–4 câu về đặc điểm tính cách và cách tư duy nổi bật theo MBTI (cách tiếp nhận thông tin, làm việc nhóm, ra quyết định). Không dán nhãn cố định, không nói "em là người...".
+- interests: 3–4 câu về nhóm sở thích, hứng thú nghề nghiệp nổi trội theo Holland, giải thích vì sao phù hợp với các lựa chọn của em.
+- environment: 3–4 câu gợi mở môi trường học tập, tổ hợp môn THPT, hoạt động trải nghiệm và nhóm lĩnh vực nghề nghiệp nên thử; nêu cách dùng gợi ý này để bước vào lộ trình THU – LỌC – THỬ – CHỐT – CAM KẾT.
+- Tuyệt đối không quyết định thay học sinh, không xếp hạng nghề, không dùng từ "FOBO", không bịa số liệu học phí, điểm chuẩn hay tên trường.
+- Xưng "mình", gọi học sinh là "em". Mỗi khối là một đoạn văn liền mạch, không dùng gạch đầu dòng.`,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              personality: {
+                type: Type.STRING,
+                description: "3–4 câu nhận định về tính cách và cách tư duy theo MBTI.",
+              },
+              interests: {
+                type: Type.STRING,
+                description: "3–4 câu nhận định về nhóm hứng thú Holland nổi trội.",
+              },
+              environment: {
+                type: Type.STRING,
+                description: "3–4 câu gợi mở môi trường học tập và hướng khám phá tiếp theo.",
+              },
+            },
+            required: ["personality", "interests", "environment"],
+          },
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? "{}").trim());
+      res.json({
+        personality: parsed.personality || "",
+        interests: parsed.interests || "",
+        environment: parsed.environment || "",
+      });
+    } catch (err) {
+      console.error("Gemini /api/ai/student/interest-profile error:", err);
       const formatted = formatGeminiError(err);
       res.status(formatted.status).json({ error: formatted.message });
     }

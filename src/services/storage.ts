@@ -10,6 +10,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 import { createInitialAppState, createStudentProfile } from "../data/mockData";
+import { sanitizeInterestQuiz } from "../data/interestQuiz";
 import { DEFAULT_CLASS_ID } from "../data/schoolClasses";
 import type {
   AIMessage,
@@ -18,6 +19,7 @@ import type {
   AssessmentLevelMap,
   FirebaseConfig,
   Student,
+  StudentSummary,
 } from "../types";
 
 export const CURRENT_SCHEMA_VERSION = 6;
@@ -98,6 +100,99 @@ function isAccountStudentId(value: string): boolean {
   return value.startsWith("acc:");
 }
 
+function isCompleteStudentSummary(value: unknown): value is StudentSummary {
+  const summary = asRecord(value);
+  const identity = asRecord(summary.identity);
+  const selfProfile = asRecord(summary.selfProfile);
+  const steps = asRecord(summary.steps);
+
+  const hasStrings = (record: Record<string, unknown>, keys: string[]) =>
+    keys.every((key) => typeof record[key] === "string");
+
+  if (
+    !hasStrings(summary, ["generatedAt", "sentToTeacherAt", "aiInteraction", "readiness", "sendStatus"]) ||
+    (summary.sentToParentAt !== null &&
+      typeof summary.sentToParentAt !== "string") ||
+    !hasStrings(identity, [
+      "fullName",
+      "className",
+      "parentContact",
+      "teacherContact",
+      "completedAt",
+    ]) ||
+    !hasStrings(selfProfile, [
+      "strengths",
+      "teacherNote",
+      "holland",
+      "conditions",
+      "fluctuation",
+    ]) ||
+    !hasStrings(steps, ["thu", "loc", "thuTry", "chot", "camKet"])
+  ) {
+    return false;
+  }
+
+  if (
+    selfProfile.mbti !== undefined &&
+    typeof selfProfile.mbti !== "string"
+  ) {
+    return false;
+  }
+
+  if (selfProfile.interestAnalysis !== undefined) {
+    const analysis = asRecord(selfProfile.interestAnalysis);
+    if (
+      !hasStrings(analysis, ["personality", "interests", "environment", "completedAt"]) ||
+      (analysis.source !== "ai" && analysis.source !== "fallback")
+    ) {
+      return false;
+    }
+  }
+
+  if (steps.tryDetails !== undefined) {
+    const details = asRecord(steps.tryDetails);
+    if (
+      !Array.isArray(details.scenarioReflections) ||
+      !Array.isArray(details.activities) ||
+      !Array.isArray(details.journalEntries) ||
+      typeof details.crossCheck !== "string"
+    ) {
+      return false;
+    }
+    const validScenario = details.scenarioReflections.every((item) => {
+      const record = asRecord(item);
+      return (
+        hasStrings(record, ["pathwayTitle", "reflection", "date"]) &&
+        Array.isArray(record.chosenPathLabels)
+      );
+    });
+    const validActivity = details.activities.every((item) =>
+      hasStrings(asRecord(item), [
+        "title",
+        "activityType",
+        "dateLabel",
+        "location",
+        "status",
+      ])
+    );
+    const validJournal = details.journalEntries.every((item) => {
+      const record = asRecord(item);
+      if (!hasStrings(record, ["activityType", "date", "content"])) {
+        return false;
+      }
+      if (record.reflection3Q === undefined) return true;
+      return hasStrings(asRecord(record.reflection3Q), [
+        "saw",
+        "felt",
+        "changedMind",
+      ]);
+    });
+    if (!validScenario || !validActivity || !validJournal) return false;
+  }
+
+  return true;
+}
+
 function migrateStudent(item: unknown): Student {
   const s = asRecord(item);
   const id = asString(s.id);
@@ -176,6 +271,7 @@ function migrateStudent(item: unknown): Student {
         profile.hollandSummaryText,
         base.profile.hollandSummaryText
       ),
+      interestQuiz: sanitizeInterestQuiz(profile.interestQuiz),
       conditions: {
         commuteDistance: asString(conditions.commuteDistance),
         familyFinance: asString(conditions.familyFinance),
@@ -257,6 +353,7 @@ function migrateStudent(item: unknown): Student {
         ...asRecord(studentSelf),
       } as AssessmentLevelMap,
     },
+    summary: isCompleteStudentSummary(s.summary) ? s.summary : undefined,
   };
 }
 
@@ -299,18 +396,9 @@ export function migrateAppState(raw: unknown): AppState {
     ? record.tryActivities
     : baseline.experiences;
 
-  const migratedPathways =
-    version < 6
-      ? baseline.pathways
-      : Array.isArray(record.pathways)
-      ? (record.pathways as AppState["pathways"]).map((p) => {
-          const baseMatch = baseline.pathways.find((bp) => bp.id === p.id);
-          return {
-            ...p,
-            scenario: p.scenario || baseMatch?.scenario,
-          };
-        })
-      : baseline.pathways;
+  // Nội dung thẻ lộ trình là dữ liệu tham chiếu cố định: luôn lấy bản mới nhất
+  // thay vì bản sao đã lưu trong localStorage của từng thiết bị.
+  const migratedPathways = baseline.pathways;
 
   const rawSettings =
     record.settings && typeof record.settings === "object"
@@ -340,7 +428,6 @@ export function migrateAppState(raw: unknown): AppState {
       ...baseline.settings,
       ...rawSettings,
       fontSize: rawSettings.fontSize || "medium",
-      googleFormSurveyUrl: rawSettings.googleFormSurveyUrl || "",
     },
   };
 }

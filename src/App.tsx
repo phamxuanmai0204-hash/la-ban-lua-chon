@@ -39,20 +39,18 @@ import {
   logoutAccount,
   validateStoredSession,
 } from "./services/auth";
+import { publishStudentRecord } from "./services/studentRecords";
 import type {
   AIMessage,
   AIModerationAction,
   AIModerationLog,
   AppState,
   AuthSession,
-  Experience,
   FirebaseConfig,
   FontSizeScale,
   LinkedChild,
   Meeting,
-  Pathway,
   Student,
-  ThematicCodeItem,
 } from "./types";
 
 function accountStudentId(accountId: string): string {
@@ -291,6 +289,44 @@ export default function App() {
     }));
   };
 
+  const handleStudentAccountRenamed = (
+    accountId: string,
+    fullName: string
+  ) => {
+    const studentId = accountStudentId(accountId);
+    setAppState((prev) => ({
+      ...prev,
+      students: prev.students.map((s) =>
+        s.id === studentId
+          ? {
+              ...s,
+              fullName,
+              commitment: { ...s.commitment, studentFullName: fullName },
+            }
+          : s
+      ),
+      aiMessages: prev.aiMessages.map((m) =>
+        m.studentId === studentId ? { ...m, studentName: fullName } : m
+      ),
+      meetings: prev.meetings.map((m) =>
+        m.studentId === studentId ? { ...m, studentName: fullName } : m
+      ),
+    }));
+  };
+
+  const handleStudentAccountDeleted = (accountId: string) => {
+    const studentId = accountStudentId(accountId);
+    setAppState((prev) => ({
+      ...prev,
+      students: prev.students.filter((s) => s.id !== studentId),
+      aiMessages: prev.aiMessages.filter((m) => m.studentId !== studentId),
+      aiModerationLogs: prev.aiModerationLogs.filter(
+        (log) => log.studentId !== studentId
+      ),
+      meetings: prev.meetings.filter((m) => m.studentId !== studentId),
+    }));
+  };
+
   const handleTriggerAIQuestion = async ({
     student,
     studentMessage,
@@ -441,13 +477,6 @@ export default function App() {
     }));
   };
 
-  const handleUpdateThematicCodes = (next: ThematicCodeItem[]) => {
-    setAppState((prev) => ({
-      ...prev,
-      thematicCodes: next,
-    }));
-  };
-
   const handleToggleRequireApproval = () => {
     setAppState((prev) => ({
       ...prev,
@@ -470,55 +499,6 @@ export default function App() {
     setAppState((prev) => ({
       ...prev,
       meetings: prev.meetings.map((m) => (m.id === meeting.id ? meeting : m)),
-    }));
-  };
-
-  const handleUpdatePathway = (updated: Pathway) => {
-    setAppState((prev) => ({
-      ...prev,
-      pathways: prev.pathways.map((p) => (p.id === updated.id ? updated : p)),
-    }));
-  };
-
-  const handleAddPathway = (created: Pathway) => {
-    setAppState((prev) => ({
-      ...prev,
-      pathways: [...prev.pathways, created],
-    }));
-  };
-
-  const handleAddExperience = (activity: Experience) => {
-    setAppState((prev) => ({
-      ...prev,
-      experiences: [activity, ...prev.experiences],
-    }));
-  };
-
-  const handleDeleteExperience = (id: string) => {
-    setAppState((prev) => ({
-      ...prev,
-      experiences: prev.experiences.filter((e) => e.id !== id),
-    }));
-  };
-
-  const handleImportContent = (payload: {
-    pathways: Pathway[];
-    experiences: Experience[];
-  }) => {
-    setAppState((prev) => ({
-      ...prev,
-      pathways: payload.pathways,
-      experiences: payload.experiences,
-    }));
-  };
-
-  const handleUpdateGoogleFormSurveyUrl = (url: string) => {
-    setAppState((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        googleFormSurveyUrl: url,
-      },
     }));
   };
 
@@ -637,6 +617,33 @@ export default function App() {
     return null;
   }, [session, appState.students, activeChildId]);
 
+  // Mỗi thay đổi của học sinh được gửi lên máy chủ để giáo viên chủ nhiệm
+  // (tài khoản cố định CoThuy912) nhận được hồ sơ từ thiết bị của em.
+  const lastPublishedRef = useRef<string>("");
+  useEffect(() => {
+    if (!isHydrated || !session || !activeStudent) return;
+    if (session.user.role !== "student") return;
+    if (session.token.startsWith("local-")) return;
+
+    const serialized = JSON.stringify(activeStudent);
+    let cancelled = false;
+    const publish = () => {
+      if (serialized === lastPublishedRef.current) return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      void publishStudentRecord(session, activeStudent).then((ok) => {
+        if (!cancelled && ok) lastPublishedRef.current = serialized;
+      });
+    };
+
+    const timer = setTimeout(publish, 800);
+    window.addEventListener("online", publish);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      window.removeEventListener("online", publish);
+    };
+  }, [isHydrated, session, activeStudent]);
+
   const parentChildOptions = parentLinks.map((link) => ({
     id: link.studentId,
     label: childOptionLabel(link),
@@ -708,21 +715,18 @@ export default function App() {
           appState={appState}
           onUpdateStudent={handleUpdateStudent}
           onUpdateAIMessage={handleUpdateAIMessage}
-          onUpdateThematicCodes={handleUpdateThematicCodes}
           onToggleRequireApproval={handleToggleRequireApproval}
           onAddMeeting={handleAddMeeting}
           onUpdateMeeting={handleUpdateMeeting}
-          onUpdatePathway={handleUpdatePathway}
-          onAddPathway={handleAddPathway}
-          onAddExperience={handleAddExperience}
-          onDeleteExperience={handleDeleteExperience}
-          onImportContent={handleImportContent}
           onOpenSettings={() => setShowSettings(true)}
           onToggleDarkMode={handleToggleDarkMode}
           onExitRole={handleLogout}
           account={session.user}
+          authSession={session}
           offlineSession={offlineSession}
           onLogout={handleLogout}
+          onStudentAccountRenamed={handleStudentAccountRenamed}
+          onStudentAccountDeleted={handleStudentAccountDeleted}
         />
       ) : role === "parent" && activeStudent ? (
         <ParentView
@@ -743,7 +747,22 @@ export default function App() {
           roster={parentRoster}
           onLinkChild={handleLinkChild}
         />
-      ) : null}
+      ) : (
+        <div className="min-h-screen bg-[#FAFBFD] dark:bg-[#0F171E] flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Vai trò của tài khoản này không còn được hỗ trợ trong phiên bản
+            hiện tại. Vui lòng đăng xuất và đăng nhập bằng tài khoản Học sinh,
+            Phụ huynh hoặc Giáo viên.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="min-h-[40px] px-4 py-2 rounded-xl bg-[#E27396] hover:bg-[#EA9AB2] text-[#1D1519] text-sm font-semibold cursor-pointer"
+          >
+            Đăng xuất
+          </button>
+        </div>
+      )}
 
       {accountNotice && (
         <div
@@ -765,12 +784,10 @@ export default function App() {
         appState={appState}
         activeStorageKind={storageService.kind}
         schemaVersion={appState.schemaVersion}
-        googleFormSurveyUrl={appState.settings.googleFormSurveyUrl}
         requireTeacherApprovalBeforeDisplay={
           appState.settings.requireTeacherApprovalBeforeDisplay
         }
         onToggleRequireApproval={handleToggleRequireApproval}
-        onUpdateGoogleFormSurveyUrl={handleUpdateGoogleFormSurveyUrl}
         onResetSampleData={handleResetSampleData}
         onImportFullAppState={(next) => setAppState(next)}
         onClose={() => setShowSettings(false)}

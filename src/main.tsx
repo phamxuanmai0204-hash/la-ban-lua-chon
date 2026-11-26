@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
+import { AppErrorBoundary } from "./components/AppErrorBoundary.tsx";
 import "./index.css";
 
 registerSW({
@@ -10,5 +11,9 @@ registerSW({
   },
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>
+);
 
