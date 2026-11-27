@@ -214,7 +214,8 @@ export async function requestTeacherJourneySummary(
   const conditionsSummary = [
     student.profile.conditions.commuteDistance,
     student.profile.conditions.familyFinance,
-    student.profile.conditions.earlyIndependence,
+    student.profile.conditions.healthNote,
+    student.profile.conditions.otherConditions,
   ]
     .filter(Boolean)
     .join("; ");
@@ -265,7 +266,8 @@ export async function requestTeacherMeetingAgenda(
   const conditionsSummary = [
     student.profile.conditions.commuteDistance,
     student.profile.conditions.familyFinance,
-    student.profile.conditions.earlyIndependence,
+    student.profile.conditions.healthNote,
+    student.profile.conditions.otherConditions,
   ]
     .filter(Boolean)
     .join("; ");

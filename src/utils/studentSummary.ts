@@ -335,14 +335,14 @@ export function buildStudentSummary(
           student.profile.conditions.familyFinance
             ? `Tài chính gia đình: ${student.profile.conditions.familyFinance}`
             : "",
-          student.profile.conditions.earlyIndependence
-            ? `Tự lập sớm: ${student.profile.conditions.earlyIndependence}`
-            : "",
           student.profile.conditions.healthNote
             ? `Sức khỏe: ${student.profile.conditions.healthNote}`
             : "",
+          student.profile.conditions.otherConditions
+            ? `Điều kiện khác: ${student.profile.conditions.otherConditions}`
+            : "",
         ],
-        "Chưa ghi điều kiện gia đình/đi lại/tự lập."
+        "Chưa ghi điều kiện thực tế của em và gia đình."
       ),
       fluctuation: describeFluctuation(student),
     },

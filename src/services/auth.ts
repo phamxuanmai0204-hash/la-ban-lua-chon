@@ -11,6 +11,7 @@ import {
   formatPasswordError,
   formatPinError,
   formatUsernameError,
+  normalizePassword,
   normalizeUsername,
   usernameKey,
   validateLoginInput,
@@ -263,8 +264,15 @@ async function tryLocalLogin(input: LoginAccountInput): Promise<AuthSession | nu
     (a) => a.usernameKey === usernameKey(input.username)
   );
   if (!account) return null;
-  if (!(await verifyLocalPassword(account, input.password))) return null;
-  return buildLocalSession(account);
+  const trimmed = normalizePassword(input.password);
+  if (await verifyLocalPassword(account, trimmed)) {
+    return buildLocalSession(account);
+  }
+  // Tương thích tài khoản cũ từng lưu mật khẩu kèm khoảng trắng hai đầu.
+  if (trimmed !== input.password && (await verifyLocalPassword(account, input.password))) {
+    return buildLocalSession(account);
+  }
+  return null;
 }
 
 function isAuthSession(value: unknown): value is AuthSession {
@@ -308,6 +316,69 @@ export function clearStoredSession(): void {
     localStorage.removeItem(AUTH_SESSION_KEY);
   } catch {
     // Ignore restricted storage
+  }
+}
+
+const LEGACY_DEVICE_RESET_KEY = "la_ban_v2:legacy_students_reset_v2:device";
+
+/**
+ * Dọn một lần tài khoản học sinh cũ đã lưu trên thiết bị (bản mirror ngoại
+ * tuyến) để khớp với đợt reset dữ liệu học sinh ở máy chủ. Không đụng tới tài
+ * khoản giáo viên cố định và không chạy lại ở các lần mở app sau.
+ */
+export function resetLegacyStudentAccountsOnDevice(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem(LEGACY_DEVICE_RESET_KEY)) return;
+    const accounts = readLocalAccounts();
+    const nextAccounts = accounts
+      .filter((account) => account.role !== "student")
+      .map((account) => {
+        if (account.role !== "parent") return account;
+        // Reset xóa toàn bộ học sinh cũ nên mọi liên kết con đều treo lơ lửng.
+        const linked = account.linkedChildren ?? [];
+        return linked.length === 0
+          ? account
+          : { ...account, linkedChildren: [] };
+      });
+    if (nextAccounts.length !== accounts.length) {
+      writeLocalAccounts(nextAccounts);
+    } else if (accounts.some((account) => (account.linkedChildren ?? []).length > 0)) {
+      writeLocalAccounts(nextAccounts);
+    }
+    const storedSession = getStoredSession();
+    if (
+      storedSession?.user.role === "student" ||
+      storedSession?.user.role === "parent"
+    ) {
+      clearStoredSession();
+    }
+    localStorage.setItem(LEGACY_DEVICE_RESET_KEY, new Date().toISOString());
+  } catch {
+    // Trình duyệt chặn localStorage — bỏ qua, lần mở sau thử lại.
+  }
+}
+
+/**
+ * Đồng bộ bản lưu tài khoản trên thiết bị với danh sách học sinh mới nhất từ
+ * máy chủ: bỏ học sinh đã bị xóa để không đăng nhập nhầm bằng bản offline.
+ */
+export function pruneLocalStudentAccounts(validAccountIds: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const valid = new Set(validAccountIds);
+    const accounts = readLocalAccounts();
+    const kept = accounts.filter(
+      (account) => account.role !== "student" || valid.has(account.id)
+    );
+    if (kept.length === accounts.length) return;
+    writeLocalAccounts(kept);
+    const storedSession = getStoredSession();
+    if (storedSession?.user.role === "student" && !valid.has(storedSession.user.id)) {
+      clearStoredSession();
+    }
+  } catch {
+    // Trình duyệt chặn localStorage — bỏ qua.
   }
 }
 
@@ -499,14 +570,15 @@ function validateOptionalPin(pin: string | undefined): string {
 }
 
 function validatePassword(password: string): string {
-  const passwordError = formatPasswordError(password);
+  const normalized = normalizePassword(password);
+  const passwordError = formatPasswordError(normalized);
   if (passwordError) {
     throw new AuthError(passwordError, {
       code: "INVALID_INPUT",
       field: "password",
     });
   }
-  return password;
+  return normalized;
 }
 
 async function updateLocalStudentAccount(
@@ -942,24 +1014,26 @@ export async function changeParentPin(
 export async function registerAccount(
   input: RegisterAccountInput
 ): Promise<AuthResult> {
-  const issue = validateRegisterInput(input);
-  if (issue) {
-    throw new AuthError(issue.message, {
-      code: "INVALID_INPUT",
-      field: issue.field,
-    });
-  }
-
   const normalized: RegisterAccountInput = {
     ...input,
     fullName: input.fullName.trim(),
     username: normalizeUsername(input.username),
+    password: normalizePassword(input.password),
+    confirmPassword: normalizePassword(input.confirmPassword),
     className: input.role === "student" ? normalizeClassId() : undefined,
     parentPin: input.role === "student" ? input.parentPin?.trim() : undefined,
     childStudentId:
       input.role === "parent" ? input.childStudentId : undefined,
     childPin: input.role === "parent" ? input.childPin?.trim() : undefined,
   };
+
+  const issue = validateRegisterInput(normalized);
+  if (issue) {
+    throw new AuthError(issue.message, {
+      code: "INVALID_INPUT",
+      field: issue.field,
+    });
+  }
 
   try {
     const payload = await apiRequest<unknown>("/register", {

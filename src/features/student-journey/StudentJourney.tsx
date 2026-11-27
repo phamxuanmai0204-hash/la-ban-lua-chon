@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Compass,
   User,
@@ -191,17 +191,41 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
   );
 
   // AI auto-compiles the 6-part summary once every journey step is finished
+  const summaryFingerprintRef = useRef<Record<string, string>>({});
   useEffect(() => {
     if (!allStepsCompleted(student)) return;
     const quizCompletedAt = sanitizeInterestQuiz(
       student.profile.interestQuiz
     )?.completedAt;
-    const summaryQuizCompletedAt =
-      student.summary?.selfProfile?.interestAnalysis?.completedAt;
+
+    // Bất kỳ câu trả lời nào của học sinh (tình huống, hoạt động, nhật ký,
+    // điều kiện, lựa chọn...) thay đổi đều phải vào lại Hồ sơ tổng hợp.
+    const fingerprint = JSON.stringify({
+      quizCompletedAt,
+      conditions: student.profile.conditions,
+      profile: [
+        student.profile.abilitiesStudentSelf,
+        student.profile.abilitiesTeacherNote,
+        student.profile.hollandSummaryText,
+      ],
+      criteria: student.criteria,
+      options: student.consideredOptions,
+      joined: student.joinedExperienceIds,
+      journal: student.journal,
+      scenario: student.scenarioReflections ?? [],
+      commitment: student.commitment,
+      signals: student.signals,
+      assessment: student.assessment,
+      messages: aiMessages
+        .filter((msg) => msg.studentId === student.id)
+        .map((msg) => msg.id),
+    });
+
     const summaryIsCurrent =
       student.summary &&
-      (!quizCompletedAt || summaryQuizCompletedAt === quizCompletedAt);
+      summaryFingerprintRef.current[student.id] === fingerprint;
     if (summaryIsCurrent) return;
+    summaryFingerprintRef.current[student.id] = fingerprint;
     const summary = buildStudentSummary(student, aiMessages, experiences);
     onUpdateStudent({
       ...student,
@@ -593,7 +617,7 @@ export const StudentJourney: React.FC<StudentJourneyProps> = ({
               className="min-h-[38px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#9D2950] dark:text-[#EA9AB2]" />
-              <span className="hidden sm:inline">Cách app dùng AI</span>
+              <span className="hidden sm:inline">Cách ứng dụng sử dụng AI</span>
               <span className="sm:hidden">Dùng AI</span>
             </button>
 

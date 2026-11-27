@@ -41,6 +41,11 @@ export function normalizeUsername(value: string): string {
   return value.trim();
 }
 
+/** Bỏ khoảng trắng thừa hai đầu mật khẩu trước khi lưu/kiểm tra. */
+export function normalizePassword(value: string): string {
+  return value.trim();
+}
+
 export function usernameKey(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -81,13 +86,14 @@ export function formatFullNameError(value: string): string {
 }
 
 export function formatPasswordError(value: string): string {
-  if (!value) {
+  const normalized = normalizePassword(value);
+  if (!normalized) {
     return "Vui lòng nhập mật khẩu.";
   }
-  if (value.length < 6) {
+  if (normalized.length < 6) {
     return "Mật khẩu cần ít nhất 6 kí tự.";
   }
-  if (value.length > 72) {
+  if (normalized.length > 72) {
     return "Mật khẩu dài quá 72 kí tự.";
   }
   return "";
@@ -97,10 +103,10 @@ export function formatConfirmPasswordError(
   password: string,
   confirmPassword: string
 ): string {
-  if (!confirmPassword) {
+  if (!confirmPassword.trim()) {
     return "Vui lòng nhập lại mật khẩu để xác nhận.";
   }
-  return password === confirmPassword
+  return normalizePassword(password) === normalizePassword(confirmPassword)
     ? ""
     : "Mật khẩu xác nhận chưa khớp. Vui lòng nhập lại.";
 }
@@ -168,7 +174,7 @@ export function validateLoginInput(input: {
       message: "Vui lòng nhập tên đăng nhập hoặc email.",
     };
   }
-  if (!input.password) {
+  if (!input.password.trim()) {
     return { field: "password", message: "Vui lòng nhập mật khẩu." };
   }
   return null;

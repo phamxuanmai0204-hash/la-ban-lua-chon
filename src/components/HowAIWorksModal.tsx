@@ -40,7 +40,7 @@ export const HowAIWorksModal: React.FC<HowAIWorksModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng trang giải thích cách app dùng AI"
+            aria-label="Đóng trang giải thích cách ứng dụng sử dụng AI"
             className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-5 h-5" />

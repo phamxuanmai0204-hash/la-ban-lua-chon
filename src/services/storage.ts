@@ -275,8 +275,8 @@ function migrateStudent(item: unknown): Student {
       conditions: {
         commuteDistance: asString(conditions.commuteDistance),
         familyFinance: asString(conditions.familyFinance),
-        earlyIndependence: asString(conditions.earlyIndependence),
         healthNote: asString(conditions.healthNote),
+        otherConditions: asString(conditions.otherConditions),
       },
     },
     criteria: Array.isArray(s.criteria)
@@ -394,11 +394,23 @@ export function migrateAppState(raw: unknown): AppState {
     ? record.experiences
     : Array.isArray(record.tryActivities)
     ? record.tryActivities
-    : baseline.experiences;
+    : [];
 
   // Nội dung thẻ lộ trình là dữ liệu tham chiếu cố định: luôn lấy bản mới nhất
   // thay vì bản sao đã lưu trong localStorage của từng thiết bị.
   const migratedPathways = baseline.pathways;
+
+  // Hoạt động trải nghiệm do nhà trường cung cấp cũng cần luôn được cập nhật;
+  // giữ lại các hoạt động bổ sung (nếu có) không trùng mã với dữ liệu gốc.
+  const baselineExperienceIds = new Set(
+    baseline.experiences.map((item) => item.id)
+  );
+  const migratedExperiences: AppState["experiences"] = [
+    ...baseline.experiences,
+    ...(rawExperiences as AppState["experiences"]).filter(
+      (item) => item && !baselineExperienceIds.has(item.id)
+    ),
+  ];
 
   const rawSettings =
     record.settings && typeof record.settings === "object"
@@ -409,7 +421,7 @@ export function migrateAppState(raw: unknown): AppState {
     schemaVersion: Math.max(CURRENT_SCHEMA_VERSION, version),
     students: migratedStudents,
     pathways: migratedPathways,
-    experiences: rawExperiences as AppState["experiences"],
+    experiences: migratedExperiences,
     aiMessages: migratedMessages,
     aiModerationLogs: Array.isArray(record.aiModerationLogs)
       ? (record.aiModerationLogs as AppState["aiModerationLogs"]).filter((log) =>

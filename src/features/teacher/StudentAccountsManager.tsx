@@ -19,7 +19,6 @@ import {
   AuthError,
   createStudentAccount,
   deleteStudentAccount,
-  listStudentAccounts,
   updateStudentAccount,
   type StudentAccountSummary,
 } from "../../services/auth";
@@ -30,8 +29,13 @@ import type { AuthSession, Student } from "../../types";
 interface StudentAccountsManagerProps {
   session: AuthSession | null;
   students: Student[];
-  onStudentRenamed: (accountId: string, fullName: string) => void;
-  onStudentDeleted: (accountId: string) => void;
+  accounts: StudentAccountSummary[];
+  loading: boolean;
+  loadError: string | null;
+  onReload: () => void;
+  onStudentCreated: (account: StudentAccountSummary) => void;
+  onStudentUpdated: (account: StudentAccountSummary) => void;
+  onStudentDeleted: (account: StudentAccountSummary) => void;
 }
 
 interface AccountFormState {
@@ -55,12 +59,6 @@ function initialsOf(name: string) {
   return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function sortAccounts(accounts: StudentAccountSummary[]) {
-  return [...accounts].sort((a, b) =>
-    a.fullName.localeCompare(b.fullName, "vi")
-  );
-}
-
 const AVATAR_ACCENTS = [
   "bg-[#B3DEE2]/70 text-[#133C42]",
   "bg-[#EAF2D7] text-[#223A1E]",
@@ -71,10 +69,17 @@ const AVATAR_ACCENTS = [
 
 export const StudentAccountsManager: React.FC<
   StudentAccountsManagerProps
-> = ({ session, students, onStudentRenamed, onStudentDeleted }) => {
-  const [accounts, setAccounts] = useState<StudentAccountSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+> = ({
+  session,
+  students,
+  accounts,
+  loading,
+  loadError,
+  onReload,
+  onStudentCreated,
+  onStudentUpdated,
+  onStudentDeleted,
+}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StudentAccountSummary | null>(
@@ -86,33 +91,6 @@ export const StudentAccountsManager: React.FC<
     tone: "success" | "warning";
     text: string;
   } | null>(null);
-
-  const loadAccounts = async () => {
-    if (!session) {
-      setLoadError("Chưa có phiên đăng nhập giáo viên.");
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const list = await listStudentAccounts(session);
-      setAccounts(sortAccounts(list));
-    } catch (err) {
-      setLoadError(
-        err instanceof Error
-          ? err.message
-          : "Không tải được danh sách tài khoản học sinh."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadAccounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.token]);
 
   useEffect(() => {
     if (!notice) return;
@@ -169,16 +147,6 @@ export const StudentAccountsManager: React.FC<
     const profile = profileByStudentId.get(`acc:${account.id}`);
     return Boolean(profile && !profile.summary && !allStepsCompleted(profile));
   }).length;
-
-  const applySavedAccount = (account: StudentAccountSummary) => {
-    setAccounts((prev) =>
-      sortAccounts(
-        prev.some((item) => item.id === account.id)
-          ? prev.map((item) => (item.id === account.id ? account : item))
-          : [...prev, account]
-      )
-    );
-  };
 
   const handleCopyPin = async (pin: string) => {
     if (!pin) return;
@@ -300,7 +268,7 @@ export const StudentAccountsManager: React.FC<
           </span>
           <button
             type="button"
-            onClick={() => void loadAccounts()}
+            onClick={onReload}
             className="min-h-[34px] px-3 py-1 rounded-full border border-rose-300 dark:border-rose-600 text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer"
           >
             Tải lại
@@ -472,7 +440,7 @@ export const StudentAccountsManager: React.FC<
           session={session}
           onClose={() => setCreateOpen(false)}
           onSaved={(account, savedOffline) => {
-            applySavedAccount(account);
+            onStudentCreated(account);
             setCreateOpen(false);
             setNotice({
               tone: savedOffline ? "warning" : "success",
@@ -491,9 +459,8 @@ export const StudentAccountsManager: React.FC<
           account={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={(account, savedOffline) => {
-            applySavedAccount(account);
+            onStudentUpdated(account);
             setEditTarget(null);
-            onStudentRenamed(account.id, account.fullName);
             setNotice({
               tone: savedOffline ? "warning" : "success",
               text: savedOffline
@@ -511,11 +478,8 @@ export const StudentAccountsManager: React.FC<
           onClose={() => setDeleteTarget(null)}
           onDeleted={() => {
             const removed = deleteTarget;
-            setAccounts((prev) =>
-              prev.filter((item) => item.id !== removed.id)
-            );
             setDeleteTarget(null);
-            onStudentDeleted(removed.id);
+            onStudentDeleted(removed);
             setNotice({
               tone: "success",
               text: `Đã xóa tài khoản ${removed.fullName} (${removed.username}).`,

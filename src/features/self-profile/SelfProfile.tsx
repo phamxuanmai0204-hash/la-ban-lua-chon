@@ -131,7 +131,7 @@ export const SelfProfile: React.FC<SelfProfileProps> = ({
               htmlFor="cond-commute"
               className="block text-sm font-semibold text-slate-800 dark:text-slate-100"
             >
-              Khoảng cách đi lại phù hợp
+              Khoảng cách đi lại
             </label>
             <input
               id="cond-commute"
@@ -162,23 +162,6 @@ export const SelfProfile: React.FC<SelfProfileProps> = ({
 
           <div className="space-y-1.5">
             <label
-              htmlFor="cond-indep"
-              className="block text-sm font-semibold text-slate-800 dark:text-slate-100"
-            >
-              Mong muốn sớm tự lập
-            </label>
-            <input
-              id="cond-indep"
-              type="text"
-              value={profile.conditions.earlyIndependence}
-              onChange={(e) => handleConditionChange("earlyIndependence", e.target.value)}
-              placeholder="Ví dụ: Muốn sớm có nghề đi làm phụ gia đình"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396]"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label
               htmlFor="cond-health"
               className="block text-sm font-semibold text-slate-800 dark:text-slate-100"
             >
@@ -191,6 +174,23 @@ export const SelfProfile: React.FC<SelfProfileProps> = ({
               onChange={(e) => handleConditionChange("healthNote", e.target.value)}
               placeholder="Ví dụ: Sức khỏe ổn định, không đi xa giờ cao điểm"
               className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396]"
+            />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label
+              htmlFor="cond-other"
+              className="block text-sm font-semibold text-slate-800 dark:text-slate-100"
+            >
+              Điều kiện khác
+            </label>
+            <textarea
+              id="cond-other"
+              rows={3}
+              value={profile.conditions.otherConditions}
+              onChange={(e) => handleConditionChange("otherConditions", e.target.value)}
+              placeholder="Mô tả thêm điều kiện của bản thân/gia đình ảnh hưởng tới lựa chọn, ví dụ: phải phụ việc gia đình buổi tối, nhà có người thân làm nghề, ưu tiên học gần nhà…"
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E27396] resize-y"
             />
           </div>
         </div>

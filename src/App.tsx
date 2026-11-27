@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AuthScreen } from "./components/AuthScreen";
 import { ProjectIntro } from "./components/ProjectIntro";
 import { SettingsModal } from "./components/SettingsModal";
@@ -37,6 +37,7 @@ import {
   clearStoredSession,
   getStoredSession,
   logoutAccount,
+  pruneLocalStudentAccounts,
   validateStoredSession,
 } from "./services/auth";
 import { publishStudentRecord } from "./services/studentRecords";
@@ -55,6 +56,37 @@ import type {
 
 function accountStudentId(accountId: string): string {
   return `acc:${accountId}`;
+}
+
+const LEGACY_STATE_RESET_KEY = "la_ban_v2:legacy_students_reset_v2:state";
+
+function legacyStudentStateResetNeeded(): boolean {
+  try {
+    return (
+      typeof window !== "undefined" &&
+      !localStorage.getItem(LEGACY_STATE_RESET_KEY)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function markLegacyStudentStateReset(): void {
+  try {
+    localStorage.setItem(LEGACY_STATE_RESET_KEY, new Date().toISOString());
+  } catch {
+    // Trình duyệt chặn localStorage — sẽ thử lại ở lần mở sau.
+  }
+}
+
+function withoutLegacyStudents(state: AppState): AppState {
+  return {
+    ...state,
+    students: [],
+    aiMessages: [],
+    aiModerationLogs: [],
+    meetings: [],
+  };
 }
 
 function childOptionLabel(link: LinkedChild): string {
@@ -80,6 +112,7 @@ export default function App() {
       : null;
   });
   const [schoolRoster, setSchoolRoster] = useState<SchoolRoster | null>(null);
+  const [schoolRosterLoading, setSchoolRosterLoading] = useState(false);
   const [showProjectIntro, setShowProjectIntro] = useState(false);
   const [showHowAIWorks, setShowHowAIWorks] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -98,12 +131,20 @@ export default function App() {
         if (!active) return;
 
         if (stored) {
-          const migrated = migrateAppState(stored);
+          const resetNeeded = legacyStudentStateResetNeeded();
+          const migratedBase = migrateAppState(stored);
+          const migrated = resetNeeded
+            ? withoutLegacyStudents(migratedBase)
+            : migratedBase;
           lastSerializedRef.current = JSON.stringify(migrated);
           setAppState(migrated);
-          if (JSON.stringify(stored) !== lastSerializedRef.current) {
+          if (
+            resetNeeded ||
+            JSON.stringify(stored) !== lastSerializedRef.current
+          ) {
             await storageService.set(MAIN_STATE_KEY, migrated);
             await localBackupStorage.set(MAIN_STATE_KEY, migrated);
+            if (resetNeeded) markLegacyStudentStateReset();
           }
         } else {
           // Fallback to local backup if switching to an empty remote store
@@ -111,12 +152,17 @@ export default function App() {
             MAIN_STATE_KEY
           );
           if (!active) return;
-          const initial = localBackup
+          const resetNeeded = legacyStudentStateResetNeeded();
+          const initialBase = localBackup
             ? migrateAppState(localBackup)
             : createInitialAppState();
+          const initial = resetNeeded
+            ? withoutLegacyStudents(initialBase)
+            : initialBase;
           lastSerializedRef.current = JSON.stringify(initial);
           setAppState(initial);
           await storageService.set(MAIN_STATE_KEY, initial);
+          if (resetNeeded) markLegacyStudentStateReset();
         }
       } catch {
         // Keep in-memory initial state if storage read fails
@@ -327,6 +373,73 @@ export default function App() {
     }));
   };
 
+  const handleEnsureStudentProfiles = useCallback(
+    (accounts: { id: string; fullName: string; className: string }[]) => {
+      const validIds = new Set(
+        accounts.map((item) => accountStudentId(item.id))
+      );
+      pruneLocalStudentAccounts(accounts.map((item) => item.id));
+      setAppState((prev) => {
+        const byId = new Map(
+          accounts.map((item) => [accountStudentId(item.id), item])
+        );
+        const removed = new Set(
+          prev.students
+            .filter(
+              (student) =>
+                student.id.startsWith("acc:") && !validIds.has(student.id)
+            )
+            .map((student) => student.id)
+        );
+        let changed = removed.size > 0;
+        const students = prev.students
+          .filter((student) => !removed.has(student.id))
+          .map((student) => {
+            const account = byId.get(student.id);
+            if (!account || account.fullName === student.fullName) return student;
+            changed = true;
+            return {
+              ...student,
+              fullName: account.fullName,
+              commitment: {
+                ...student.commitment,
+                studentFullName: account.fullName,
+              },
+            };
+          });
+        const missing = accounts
+          .filter(
+            (item) =>
+              !prev.students.some(
+                (student) => student.id === accountStudentId(item.id)
+              )
+          )
+          .map((item) =>
+            createStudentProfile(
+              accountStudentId(item.id),
+              item.fullName,
+              item.className
+            )
+          );
+        if (!changed && missing.length === 0) return prev;
+        return {
+          ...prev,
+          students: [...students, ...missing],
+          aiMessages: prev.aiMessages.filter(
+            (message) => !removed.has(message.studentId)
+          ),
+          aiModerationLogs: prev.aiModerationLogs.filter(
+            (log) => !removed.has(log.studentId)
+          ),
+          meetings: prev.meetings.filter(
+            (meeting) => !removed.has(meeting.studentId)
+          ),
+        };
+      });
+    },
+    []
+  );
+
   const handleTriggerAIQuestion = async ({
     student,
     studentMessage,
@@ -525,15 +638,30 @@ export default function App() {
   }, []);
 
   // Roster lớp/học sinh (từ tài khoản đã đăng ký) dùng cho liên kết phụ huynh.
+  const refreshSchoolRoster = useCallback(async () => {
+    setSchoolRosterLoading(true);
+    try {
+      const roster = await fetchSchoolRoster();
+      setSchoolRoster(roster);
+    } finally {
+      setSchoolRosterLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    let active = true;
-    void fetchSchoolRoster().then((roster) => {
-      if (active) setSchoolRoster(roster);
-    });
-    return () => {
-      active = false;
+    void refreshSchoolRoster();
+  }, [refreshSchoolRoster, session]);
+
+  // Quay lại tab khi đang ở màn hình đăng nhập/đăng ký thì nạp lại danh sách
+  // học sinh để phụ huynh thấy tài khoản con vừa được tạo ở nơi khác.
+  useEffect(() => {
+    if (session) return;
+    const handleFocus = () => {
+      void refreshSchoolRoster();
     };
-  }, [session]);
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refreshSchoolRoster, session]);
 
   useEffect(() => {
     if (!accountNotice) return;
@@ -676,6 +804,8 @@ export default function App() {
           onAuthenticated={handleAuthenticated}
           onOpenProjectIntro={() => setShowProjectIntro(true)}
           roster={schoolRoster}
+          rosterLoading={schoolRosterLoading}
+          onRefreshRoster={() => void refreshSchoolRoster()}
         />
       ) : isProfilePending ? (
         <div className="min-h-screen bg-[#FAFBFD] dark:bg-[#0F171E] flex flex-col items-center justify-center gap-3 px-6 text-center">
@@ -727,6 +857,7 @@ export default function App() {
           onLogout={handleLogout}
           onStudentAccountRenamed={handleStudentAccountRenamed}
           onStudentAccountDeleted={handleStudentAccountDeleted}
+          onEnsureStudentProfiles={handleEnsureStudentProfiles}
         />
       ) : role === "parent" && activeStudent ? (
         <ParentView

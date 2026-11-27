@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -11,7 +11,6 @@ import {
   KeyRound,
   Loader2,
   Lock,
-  Map,
   Moon,
   ShieldCheck,
   Sparkles,
@@ -54,6 +53,8 @@ interface AuthScreenProps {
   onAuthenticated: (session: AuthSession, savedOffline: boolean) => void;
   onOpenProjectIntro: () => void;
   roster: SchoolRoster | null;
+  rosterLoading?: boolean;
+  onRefreshRoster?: () => void;
 }
 
 const ROLE_ICONS: Record<Role, React.FC<{ className?: string }>> = {
@@ -80,6 +81,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onAuthenticated,
   onOpenProjectIntro,
   roster,
+  rosterLoading = false,
+  onRefreshRoster,
 }) => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [busy, setBusy] = useState(false);
@@ -101,9 +104,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [childPin, setChildPin] = useState("");
 
   const effectiveRoster = roster ?? buildLocalRoster();
-  const childCandidates = effectiveRoster.classes.flatMap(
-    (item) => item.students
+  const childCandidates = useMemo(
+    () => effectiveRoster.classes.flatMap((item) => item.students),
+    [effectiveRoster]
   );
+
+  // Nếu danh sách mới không còn học sinh đang chọn, bỏ lựa chọn cũ.
+  useEffect(() => {
+    if (!childStudentId) return;
+    if (!childCandidates.some((item) => item.id === childStudentId)) {
+      setChildStudentId("");
+    }
+  }, [childStudentId, childCandidates]);
 
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<AuthField, string>>
@@ -124,6 +136,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setMode(next);
     setFieldErrors({});
     setFormError("");
+    // Mở form đăng ký thì nạp lại danh sách học sinh mới nhất từ máy chủ.
+    if (next === "register") onRefreshRoster?.();
   };
 
   const handleAuthFailure = (err: unknown) => {
@@ -515,15 +529,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </form>
             ) : (
               <form onSubmit={handleRegisterSubmit} className="mt-6 space-y-4" noValidate>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold">
-                    Tạo tài khoản đồng hành
-                  </h2>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
-                    Chọn đúng vai trò để ứng dụng mở thẳng không gian làm việc
-                    phù hợp với bạn.
-                  </p>
-                </div>
+                <h2 className="text-xl sm:text-2xl font-bold">
+                  Tạo tài khoản mới
+                </h2>
 
                 {formError && (
                   <div
@@ -598,6 +606,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                             clearError("parentPin");
                             clearError("childStudentId");
                             clearError("childPin");
+                            if (option === "parent") onRefreshRoster?.();
                           }}
                           className={`relative text-left rounded-xl border px-3 py-2.5 transition-colors cursor-pointer ${
                             active
@@ -663,6 +672,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         }`}
                       >
                         <option value="">— Chọn họ tên con —</option>
+                        {rosterLoading && childCandidates.length === 0 && (
+                          <option value="" disabled>
+                            Đang tải danh sách học sinh…
+                          </option>
+                        )}
                         {childCandidates.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.fullName}
@@ -713,10 +727,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         mã sẽ bị từ chối. Mỗi tài khoản phụ huynh có thể liên
                         kết tối đa {MAX_CHILDREN_PER_PARENT} con và chuyển đổi
                         nhanh bằng mục &ldquo;Chọn con&rdquo; sau khi đăng nhập.
-                        Hiện có {childCandidates.length} học sinh Lớp 9 đã đăng
-                        ký để chọn.
+                        {rosterLoading
+                          ? " Đang tải danh sách học sinh Lớp 9…"
+                          : ` Hiện có ${childCandidates.length} học sinh Lớp 9 đã đăng ký để chọn.`}
                       </span>
                     </p>
+                    {!rosterLoading &&
+                      childCandidates.length === 0 &&
+                      onRefreshRoster && (
+                        <button
+                          type="button"
+                          onClick={onRefreshRoster}
+                          className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2] underline underline-offset-2 cursor-pointer"
+                        >
+                          Tải lại danh sách học sinh
+                        </button>
+                      )}
                   </fieldset>
                 )}
 
@@ -872,16 +898,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </p>
               </form>
             )}
-
-            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <Map className="w-4 h-4 shrink-0" />
-                <span>
-                  Tài khoản được lưu trên máy chủ của trường; khi mất mạng, ứng
-                  dụng tiếp tục dùng bản lưu trên thiết bị.
-                </span>
-              </div>
-            </div>
           </div>
         </section>
       </main>

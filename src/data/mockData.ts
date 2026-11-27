@@ -309,6 +309,35 @@ export const INITIAL_PATHWAYS: Pathway[] = [
       "• THPT Nguyễn Văn Thoại: 132 Đô Đốc Lân, Hòa Xuân, Đà Nẵng",
       "• THPT Nguyễn Văn Trỗi: HFXH+JP8, Thôn Đắc Rế, Xã La Dê, Huyện Nam Giang, Tỉnh Quảng Nam, La Dêê, Đà Nẵng",
       "• THPT Nông Sơn: P384+96X, ĐT610, Trung Phước, Nông Sơn, Đà Nẵng",
+      "• THPT Núi Thành: CMM4+8JW, khối 3, Núi Thành, Đà Nẵng",
+      "• THPT Ông Ích Khiêm: X4MP+43V, QL14G, Hòa Vang, Đà Nẵng",
+      "• THPT Phạm Phú Thứ: 34F6+P5H, thôn An Ngãi Đông, Hòa Khánh, Đà Nẵng",
+      "• THPT Phạm Phú Thứ - Gò Nổi: R6R4+97, thôn Đông Lãnh, Gò Nổi, Đà Nẵng",
+      "• THPT Phan Bội Châu: 788 Phan Châu Trinh, Hương Trà, Đà Nẵng",
+      "• THPT Phan Châu Trinh: 154 Lê Lợi, Hải Châu, Đà Nẵng",
+      "• THPT Phan Châu Trinh - Tiên Phước: 150 Phan Châu Trinh, Tiên Phước, Đà Nẵng",
+      "• THPT Phan Thành Tài: X5QW+P82, Phong Nam, Phong Lệ, Hòa Xuân, Đà Nẵng",
+      "• THPT Quang Trung - Đông Giang: WJ8Q+26G, Đông Giang, Đà Nẵng",
+      "• THPT Quế Sơn: 33 Hùng Vương, Quế Sơn, Đà Nẵng",
+      "• THPT Sào Nam: R7G4+HPC, Đ. Hùng Vương, Nam Phước, Đà Nẵng",
+      "• THPT Sơn Trà: 36FQ+6C7, Lê Văn Quý, An Hải, Đà Nẵng",
+      "• THPT Tây Giang: VFJQ+H26, Tây Giang, Đà Nẵng",
+      "• THPT Thái Phiên: 735 Trần Cao Vân, Thanh Khê, Đà Nẵng",
+      "• THPT Thái Phiên - Thăng Bình: Đường Huỳnh Thúc Kháng, Thăng Bình, Đà Nẵng",
+      "• THPT Thanh Khê: 232 Kinh Dương Vương, Thanh Khê, Đà Nẵng",
+      "• THPT Tiểu La: P9R4+MCX, Thăng Bình, Đà Nẵng",
+      "• THPT Tố Hữu: PRWJ+9V7, Hồ Chí Minh, Thạnh Mỹ, Đà Nẵng",
+      "• THPT Tôn Thất Tùng: 200 Trần Nhân Tông, An Hải, Đà Nẵng",
+      "• THPT Trần Cao Vân: Phường An Mỹ, Tam Kỳ, Đà Nẵng",
+      "• THPT Trần Đại Nghĩa: 44 Hùng Vương, Quế Sơn Trung, Đà Nẵng",
+      "• THPT Trần Hưng Đạo: 170 Cửa Đại, Hội An Đông, Đà Nẵng",
+      "• THPT Trần Phú: 11 Lê Thánh Tôn, Hải Châu, Đà Nẵng",
+      "• THPT Trần Phú - Việt An: J69F+694, QL14E, Việt An, Đà Nẵng",
+      "• THPT Trần Quý Cáp: 07 Trần Hưng Đạo, Hội An, Đà Nẵng",
+      "• THPT Trần Văn Dư: HCVG+999, ĐT615, Tây Hồ, Đà Nẵng",
+      "• THPT Võ Chí Công: X6RM+QJW, Cao Hồng Lãnh, Ngũ Hành Sơn, Đà Nẵng",
+      "• THPT Võ Chí Công - Hùng Sơn: R8M4+M87, Hùng Sơn, Đà Nẵng",
+      "• THPT Võ Nguyên Giáp: GCX5+22G, Chiên Đàn, Đà Nẵng",
     ].join("\n"),
     realSchoolAddresses:
       "Địa chỉ các trường được cập nhật theo sắp xếp đơn vị hành chính của TP. Đà Nẵng (sau sáp nhập với Quảng Nam từ 01/7/2025). Học sinh kiểm tra lại với Sở GD&ĐT trước khi nộp hồ sơ.",
@@ -451,67 +480,33 @@ export const INITIAL_PATHWAYS: Pathway[] = [
       "Danh sách trường tư thục tiêu biểu tại TP. Đà Nẵng; địa chỉ một số trường đang được cập nhật sau sắp xếp đơn vị hành chính.",
     tuitionEstimate: [
       "Học phí tham khảo (mức thu thay đổi theo chương trình và năm học):",
-      "• THPT Nguyễn Khuyến: đang cập nhật",
       "• THPT Quang Trung: khoảng 1,7 triệu đồng/tháng (2024)",
       "• THPT Sky-Line: 50–219 triệu đồng/năm tùy chương trình (2024)",
       "• THPT FPT Đà Nẵng: 30,15 triệu đồng/kỳ (lớp 10, 2026–2027)",
       "• APU: 521–568 triệu đồng/năm (2024)",
     ].join("\n"),
     admissionCutoff:
-      "Xét học bạ THCS hoặc kết hợp thi đánh giá năng lực/phỏng vấn tùy trường. Chỉ tiêu lớp 10 tư thục năm 2026–2027: hơn 4.100 học sinh.",
+      "Xét học bạ THCS hoặc kết hợp thi đánh giá năng lực/phỏng vấn tùy trường.",
     imageUrl: thptTuThucImage,
     imageCaption: "Hình ảnh tại Hệ thống Giáo dục Việt Nhật (Đà Nẵng).",
     realStories: [],
     scenario: {
       title: "Một ngày học tập và cân đối chi phí tại trường THPT tư thục",
       intro:
-        "Thử hình dung hoàn cảnh học tập, quãng đường đi lại và chi phí hàng tháng khi theo học một trường THPT tư thục.",
-      startNodeId: "n1",
-      reflectionPrompt: "Em thấy mình hợp / chưa hợp ở điểm nào?",
-      nodes: [
-        {
-          id: "n1",
-          prompt:
-            "Bạn bè rủ em nộp hồ sơ vào trường tư cách nhà 35 phút đi xe vì không phải thi căng. Trước khi quyết định, em làm gì?",
-          choices: [
-            {
-              id: "c1",
-              label: "Ngồi cùng bố mẹ tính rõ học phí 3 năm, tiền xe buýt và thời gian đi lại mỗi ngày",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Em đã kiểm tra điều kiện thực tế của gia đình thay vì chọn theo lời rủ rê.",
-            },
-            {
-              id: "c2",
-              label: "Nghĩ rằng 'chắc bố mẹ sẽ lo được' và chưa hỏi kĩ chi phí hàng tháng",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Nếu chưa hỏi kĩ gia đình, em dễ gặp áp lực tài chính hoặc mệt mỏi khi đi học xa giữa chừng.",
-            },
-          ],
-        },
-        {
-          id: "n2",
-          prompt:
-            "Sau 3 năm học văn hóa THPT ở trường tư, em dự định làm gì tiếp theo?",
-          choices: [
-            {
-              id: "c3",
-              label: "Em đã có mục tiêu rõ về ngành học tiếp theo và gia đình hoàn toàn chủ động được học phí",
-              nextNodeId: null,
-              outcomeNote:
-                "Khi mục tiêu và tài chính rõ ràng, em sẽ đi học nhẹ nhàng và vững tâm hơn.",
-            },
-            {
-              id: "c4",
-              label: "Em chỉ chọn tạm để 'vẫn đi học cấp 3 cho giống bạn', chưa rõ sau lớp 12 làm gì",
-              nextNodeId: null,
-              outcomeNote:
-                "Thử đối chiếu thêm mô hình Trung cấp nghề hoặc GDTX để xem hướng nào thiết thực hơn với em.",
-            },
-          ],
-        },
+        "Thử hình dung môi trường học tập, thời gian biểu và các khoản chi phí cần thiết khi theo học tại một trường THPT tư thục.",
+      startNodeId: "short-answer",
+      responseMode: "shortAnswer",
+      shortAnswerPrompt:
+        "Bạn bè rủ em nộp hồ sơ vào một trường THPT tư thục vì cho rằng không phải trải qua kỳ thi tuyển sinh căng thẳng. Trước khi quyết định, em sẽ tìm hiểu và cân nhắc những vấn đề gì?",
+      shortAnswerSuggestions: [
+        "Em sẽ hỏi rõ học phí và các khoản phí khác của cả 3 năm học.",
+        "Em sẽ tính thời gian và chi phí đi lại mỗi ngày từ nhà đến trường.",
+        "Em sẽ tìm hiểu chất lượng dạy học, tỉ lệ tốt nghiệp và môi trường học tập của trường.",
+        "Em sẽ trao đổi thẳng với bố mẹ về khả năng tài chính của gia đình trước khi nộp hồ sơ.",
       ],
+      nodes: [],
+      reflectionPrompt:
+        "Em thấy mình hợp / chưa hợp ở điểm nào với môi trường THPT tư thục?",
     },
   },
   {
@@ -562,52 +557,19 @@ export const INITIAL_PATHWAYS: Pathway[] = [
       title: "Một ngày học văn hóa GDTX kết hợp rèn nghề",
       intro:
         "Thử hình dung lịch học giảm số môn áp lực và dành nửa ngày để học thêm kĩ năng thực tế hoặc phụ giúp gia đình.",
-      startNodeId: "n1",
-      reflectionPrompt: "Em thấy mình hợp / chưa hợp ở điểm nào?",
-      nodes: [
-        {
-          id: "n1",
-          prompt:
-            "Buổi sáng em học các môn văn hóa cốt lõi tại trung tâm GDTX. Buổi chiều em có khoảng thời gian trống linh hoạt. Em muốn dùng buổi chiều thế nào?",
-          choices: [
-            {
-              id: "c1",
-              label: "Học thêm một lớp nghề ngắn hạn hoặc phụ giúp gia đình có thêm thu nhập",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Sự linh hoạt thời gian giúp em vừa giữ bằng tốt nghiệp THPT vừa rèn kĩ năng thực tế.",
-            },
-            {
-              id: "c2",
-              label: "Dành thời gian tự ôn lại kiến thức nền để chuẩn bị thi tốt nghiệp THPT",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Nhịp học nhẹ hơn giúp em có khoảng thở để củng cố lại các môn mình từng mất gốc.",
-            },
-          ],
-        },
-        {
-          id: "n2",
-          prompt:
-            "Một vài người xung quanh có thể hỏi vì sao em không học trường THPT bình thường. Em nghĩ sao về điều đó?",
-          choices: [
-            {
-              id: "c3",
-              label: "Em hiểu rõ đây là lựa chọn vừa sức mình và vẫn thi tốt nghiệp, học lên bình thường",
-              nextNodeId: null,
-              outcomeNote:
-                "Sự vững vàng đến từ việc em chọn điều hợp với mình chứ không chạy theo lời đồn.",
-            },
-            {
-              id: "c4",
-              label: "Em vẫn hơi ngại ánh nhìn của bạn bè dù thấy nhịp học này rất vừa sức",
-              nextNodeId: null,
-              outcomeNote:
-                "Em có thể chia sẻ thẳng điều này với thầy/cô hoặc gia đình để tìm điểm tựa tâm lí.",
-            },
-          ],
-        },
+      startNodeId: "short-answer",
+      responseMode: "shortAnswer",
+      shortAnswerPrompt:
+        "Buổi sáng em học các môn văn hóa cốt lõi tại trung tâm GDTX, buổi chiều em có khoảng thời gian trống linh hoạt. Em sẽ dùng buổi chiều của mình như thế nào để vừa học văn hóa vừa rèn thêm kĩ năng thực tế?",
+      shortAnswerSuggestions: [
+        "Em sẽ đăng kí một lớp nghề ngắn hạn vào buổi chiều để vừa học văn hóa vừa có kĩ năng.",
+        "Em dành buổi chiều để ôn lại kiến thức nền, chuẩn bị cho kì thi tốt nghiệp THPT.",
+        "Em dành một phần buổi chiều phụ giúp gia đình và sắp xếp thời gian tự học vào buổi tối.",
+        "Em sẽ hỏi thầy cô về lịch học và cách học phù hợp với nhịp của trung tâm.",
       ],
+      nodes: [],
+      reflectionPrompt:
+        "Em thấy mình hợp / chưa hợp ở điểm nào với nhịp học GDTX?",
     },
   },
   {
@@ -634,55 +596,22 @@ export const INITIAL_PATHWAYS: Pathway[] = [
     imageCaption: "Hình ảnh tại Trường Trung Cấp Ý Việt (Đà Nẵng).",
     realStories: [],
     scenario: {
-      title: "Một ngày tại xưởng thực hành Trung cấp nghề",
+      title: "Trải nghiệm học tập tại xưởng thực hành Trung cấp nghề",
       intro:
-        "Thử bước vào một buổi học nghề thực tế: phần lớn thời lượng cầm tay chỉ việc tại xưởng, phần còn lại học văn hóa THPT.",
-      startNodeId: "n1",
-      reflectionPrompt: "Em thấy mình hợp / chưa hợp ở điểm nào?",
-      nodes: [
-        {
-          id: "n1",
-          prompt:
-            "8 giờ sáng tại xưởng thực hành: thầy giáo giao nhiệm vụ lắp mạch điện chiếu sáng / cắt mẫu sản phẩm theo bản vẽ mẫu. Em tiếp cận việc này ra sao?",
-          choices: [
-            {
-              id: "c1",
-              label: "Em thích cầm dụng cụ làm thử, sai thì tháo ra kiểm tra lại từng bước",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Sự kiên nhẫn khi thao tác trực tiếp là lợi thế rất lớn trong môi trường học nghề.",
-            },
-            {
-              id: "c2",
-              label: "Em hơi ngại đứng xưởng lâu hoặc làm việc cần sự tỉ mỉ bằng tay",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Ghi nhận cảm giác này giúp em phân biệt nghề cần đôi tay khéo với các nhóm nghề khác.",
-            },
-          ],
-        },
-        {
-          id: "n2",
-          prompt:
-            "Sau khi hoàn thành sản phẩm đầu tiên vào cuối buổi chiều, thầy nhận xét em có thể đi thực tập sớm vào năm thứ hai và học tiếp lên cao đẳng nghề sau đó.",
-          choices: [
-            {
-              id: "c3",
-              label: "Em thấy nhẹ nhõm vì có tay nghề sớm phụ giúp gia đình mà vẫn còn cơ hội học tiếp",
-              nextNodeId: null,
-              outcomeNote:
-                "Con đường này đáp ứng cả nhu cầu tự lập sớm lẫn cơ hội phát triển dài hạn.",
-            },
-            {
-              id: "c4",
-              label: "Em muốn hỏi thêm người thật việc thật hoặc tham quan xưởng thật để chắc chắn hơn",
-              nextNodeId: null,
-              outcomeNote:
-                "Hãy đặt 1–2 câu hỏi cho cựu học sinh hoặc đăng kí buổi tham quan xưởng ở ngay mục dưới nhé.",
-            },
-          ],
-        },
+        "Thử hình dung môi trường học tập tại cơ sở giáo dục nghề nghiệp, nơi học sinh được trực tiếp thực hành chuyên môn tại xưởng, kết hợp với học tập văn hóa THPT.",
+      startNodeId: "short-answer",
+      responseMode: "shortAnswer",
+      shortAnswerPrompt:
+        "Trong buổi học thực hành, giáo viên giao nhiệm vụ lắp mạch điện chiếu sáng/gia công sản phẩm theo bản vẽ mẫu. Em sẽ tiếp cận và thực hiện nhiệm vụ này như thế nào?",
+      shortAnswerSuggestions: [
+        "Em sẽ đọc kĩ bản vẽ, chuẩn bị dụng cụ đầy đủ rồi làm từng bước theo hướng dẫn.",
+        "Em sẽ thử làm trước, nếu sai thì tháo ra kiểm tra lại và hỏi thầy ngay khi chưa rõ.",
+        "Em sẽ ghi chép các bước thực hành để lần sau làm nhanh và chính xác hơn.",
+        "Em hơi lo vì cần sự tỉ mỉ, nhưng em muốn thử để biết mình có hợp với nghề này không.",
       ],
+      nodes: [],
+      reflectionPrompt:
+        "Em thấy mình hợp / chưa hợp ở điểm nào với môi trường học nghề?",
     },
   },
   {
@@ -713,45 +642,19 @@ export const INITIAL_PATHWAYS: Pathway[] = [
       title: "Một ngày học nghề ngắn hạn và làm quen môi trường làm việc",
       intro:
         "Thử hình dung nhịp học thực hành tập trung trong vài tháng để sớm tự lập thu nhập.",
-      startNodeId: "n1",
-      reflectionPrompt: "Em thấy mình hợp / chưa hợp ở điểm nào?",
-      nodes: [
-        {
-          id: "n1",
-          prompt:
-            "Trong khóa sơ cấp nghề, gần như toàn bộ thời gian là học quy trình làm việc tại xưởng và làm quen kỉ luật giờ giấc như người đi làm.",
-          choices: [
-            {
-              id: "c1",
-              label: "Em muốn sớm có kĩ năng cụ thể để đi làm phụ gia đình ngay trong năm tới",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Sơ cấp nghề giúp rút ngắn thời gian chuẩn bị để em sớm đứng vững bằng công việc thực tế.",
-            },
-            {
-              id: "c2",
-              label: "Em vẫn muốn có thêm bằng văn hóa THPT song song thay vì chỉ học nghề ngắn hạn",
-              nextNodeId: "n2",
-              outcomeNote:
-                "Nếu muốn giữ bằng văn hóa THPT, em có thể đối chiếu thêm lộ trình Trung cấp nghề kết hợp văn hóa.",
-            },
-          ],
-        },
-        {
-          id: "n2",
-          prompt:
-            "Sau 1–2 năm đi làm ổn định, nếu muốn học tiếp lên Trung cấp hoặc GDTX vào buổi tối thì em nghĩ sao?",
-          choices: [
-            {
-              id: "c3",
-              label: "Em thấy yên tâm vì đi làm trước không có nghĩa là đóng cửa việc học mãi mãi",
-              nextNodeId: null,
-              outcomeNote:
-                "Học tập suốt đời cho phép em quay lại nâng bậc tay nghề bất cứ khi nào điều kiện cho phép.",
-            },
-          ],
-        },
+      startNodeId: "short-answer",
+      responseMode: "shortAnswer",
+      shortAnswerPrompt:
+        "Trong khóa sơ cấp nghề, gần như toàn bộ thời gian là học quy trình làm việc tại xưởng và làm quen kỉ luật giờ giấc như người đi làm. Em sẽ sắp xếp và thích nghi với nhịp này như thế nào?",
+      shortAnswerSuggestions: [
+        "Em sẽ tập dậy đúng giờ và giữ kỉ luật như khi đi làm để quen dần.",
+        "Em sẽ tập trung học chắc các bước thực hành cơ bản trước khi nhận việc.",
+        "Em sẽ hỏi anh chị đi trước về cách sắp xếp thời gian và giữ sức khỏe.",
+        "Em muốn thử vài buổi học thật để biết mình có theo được nhịp này không.",
       ],
+      nodes: [],
+      reflectionPrompt:
+        "Em thấy mình hợp / chưa hợp ở điểm nào với nhịp học nghề ngắn hạn?",
     },
   },
 ];
@@ -761,28 +664,61 @@ export const INITIAL_EXPERIENCES: Experience[] = [
     id: "try-1",
     title: "Tham quan xưởng thực hành Điện – Cơ khí",
     activityType: "Tham quan xưởng thực hành",
-    dateLabel: "Thứ Bảy tuần tới",
+    dateLabel: "Theo lịch của cơ sở đào tạo",
     location: "Cơ sở giáo dục nghề nghiệp liên kết",
     description:
       "Quan sát học viên thực hành lắp mạch điện dân dụng, trò chuyện trực tiếp với giảng viên hướng dẫn thực hành.",
+    audience: "vocational",
   },
   {
     id: "try-2",
-    title: "Giao lưu cùng anh chị cựu học sinh làm nghề",
+    title: "Giao lưu cùng anh chị của cơ sở đào tạo nghề",
     activityType: "Giao lưu người làm nghề",
-    dateLabel: "Chiều thứ Năm",
-    location: "Phòng sinh hoạt lớp 9",
+    dateLabel: "Theo lịch của cơ sở đào tạo",
+    location: "Cơ sở giáo dục nghề nghiệp liên kết",
     description:
       "Nghe chia sẻ chân thực về ngày đầu chọn học nghề, khó khăn gặp phải và cơ hội học tiếp lên cao đẳng nghề.",
+    audience: "vocational",
   },
   {
     id: "try-3",
-    title: "Bài tập tình huống nghề: Một ngày tại xưởng May & Thiết kế",
-    activityType: "Bài tập tình huống nghề",
-    dateLabel: "Tự chọn trong tuần",
-    location: "Phòng thực hành / tại nhà",
+    title: "Tham quan xưởng May & Thiết kế",
+    activityType: "Tham quan xưởng thực hành",
+    dateLabel: "Theo lịch của cơ sở đào tạo",
+    location: "Xưởng May & Thiết kế của cơ sở đào tạo nghề",
     description:
-      "Thử đọc bản vẽ sản phẩm đơn giản, ước lượng vật liệu và tưởng tượng một ngày làm việc thực tế.",
+      "Quan sát quy trình may – thiết kế mẫu, đọc bản vẽ sản phẩm đơn giản và tìm hiểu nhịp làm việc tại xưởng.",
+    audience: "vocational",
+  },
+  {
+    id: "try-4",
+    title: "Tham gia CLB Kỹ năng",
+    activityType: "CLB Kỹ năng",
+    dateLabel: "Theo lịch sinh hoạt CLB của trường",
+    location: "Trường THPT",
+    description:
+      "Rèn kĩ năng giao tiếp, làm việc nhóm và tự tổ chức công việc trong môi trường sinh hoạt câu lạc bộ.",
+    audience: "thpt",
+  },
+  {
+    id: "try-5",
+    title: "Tham gia tập luyện với đội văn nghệ và CLB nhạc cụ",
+    activityType: "Văn nghệ – CLB nhạc cụ",
+    dateLabel: "Theo lịch sinh hoạt CLB của trường",
+    location: "Trường THPT",
+    description:
+      "Thử một buổi tập luyện cùng đội văn nghệ, cảm nhận cách phối hợp và giữ nhịp sinh hoạt ngoài giờ học.",
+    audience: "thpt",
+  },
+  {
+    id: "try-6",
+    title: "Tham gia vận động với CLB thể thao",
+    activityType: "CLB thể thao",
+    dateLabel: "Theo lịch sinh hoạt CLB của trường",
+    location: "Trường THPT",
+    description:
+      "Thử một buổi vận động cùng CLB thể thao để cảm nhận nhịp sinh hoạt, sức bền và không khí đồng đội.",
+    audience: "thpt",
   },
 ];
 
@@ -842,8 +778,8 @@ export function createStudentProfile(
       conditions: {
         commuteDistance: "",
         familyFinance: "",
-        earlyIndependence: "",
         healthNote: "",
+        otherConditions: "",
       },
     },
     criteria: [],

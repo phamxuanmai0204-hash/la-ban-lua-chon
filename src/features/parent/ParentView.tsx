@@ -17,6 +17,9 @@ import {
   AlertCircle,
   UserRound,
   FileText,
+  HeartHandshake,
+  Quote,
+  Lightbulb,
 } from "lucide-react";
 import { CompassLogo } from "../../components/CompassLogo";
 import { AccountMenu } from "../../components/AccountMenu";
@@ -29,6 +32,24 @@ import type {
   Meeting,
   Student,
 } from "../../types";
+
+const PARENT_ARTICLE1_TIPS = [
+  "Đặt những câu hỏi mở, không áp đặt hay dẫn dắt, và kiên nhẫn trao cho con khoảng lặng để suy nghĩ.",
+  "Phản hồi lại điều con vừa chia sẻ để con cảm nhận trọn vẹn rằng mình đang được lắng nghe bằng cả tấm lòng.",
+  "Không so sánh với “con nhà người ta” hay anh chị em trong nhà.",
+  "Cùng con chọn thời gian chốt lựa chọn thật nhẹ nhàng, thay vì tạo áp lực.",
+  "Cùng con hiện thực hóa từng bước trong kế hoạch chuẩn bị, biến áp lực chọn trường thành hành trình khám phá nhẹ nhàng.",
+  "Đồng hành cùng con như một người bạn, cùng con tìm hiểu thông tin, gỡ rối âu lo và trân trọng từng bước trưởng thành của con.",
+];
+
+const PARENT_TIP_TONES = [
+  "bg-[#E27396]/25 text-[#9D2950] dark:text-[#EA9AB2]",
+  "bg-[#B3DEE2]/60 text-[#133C42] dark:text-[#B3DEE2]",
+  "bg-[#EFCFE3] text-[#4A1A2C] dark:text-[#EFCFE3]",
+  "bg-[#EAF2D7] text-[#223A1E] dark:text-[#EAF2D7]",
+  "bg-[#EA9AB2]/40 text-[#4A1A2C] dark:text-[#EA9AB2]",
+  "bg-[#B3DEE2]/60 text-[#133C42] dark:text-[#B3DEE2]",
+];
 
 interface ParentChildOption {
   id: string;
@@ -319,7 +340,7 @@ export const ParentView: React.FC<ParentViewProps> = ({
                 className="min-h-[38px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#17222C] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#133C42] dark:text-[#B3DEE2]" />
-                <span>Cách app dùng AI</span>
+                <span>Cách ứng dụng sử dụng AI</span>
               </button>
             )}
             <button
@@ -582,177 +603,239 @@ export const ParentView: React.FC<ParentViewProps> = ({
         {activeTab === "articles" && (
         /* 2 Bài đọc ngắn dành cho Phụ huynh */
         <section id="bai-doc-lien-thong" className="space-y-6">
-          <article className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-4">
-            <p className="text-xs font-semibold text-[#223A1E] dark:text-[#EAF2D7]">
-              Bài đọc ngắn 1 dành cho Phụ huynh
-            </p>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              Vai trò của sự đồng cảm, thấu hiểu của phụ huynh học sinh
-            </h2>
-            <div className="space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
-              <p>
-                Khi con bước vào năm cuối cấp, điều con cần không chỉ là thêm
-                thông tin về trường hay ngành nghề, mà còn là cảm giác được
-                hiểu. Nhiều em học lực khá, thậm chí rất tốt, vẫn có thể phân
-                vân hàng tháng trời giữa vài trường THPT công lập, liên tục đổi
-                nguyện vọng vì sợ chọn sai hoặc sợ bỏ lỡ một lựa chọn tốt hơn.
-              </p>
-              <p>
-                Sự đồng cảm của bố mẹ không có nghĩa là đồng ý với mọi lựa chọn
-                của con, mà là lắng nghe trước khi phán xét. Khi con nói
-                &ldquo;con chưa biết chọn trường nào&rdquo;, thay vì đáp lại
-                bằng áp lực hay lời trách, bố mẹ có thể ghi nhận cảm xúc của
-                con: &ldquo;Bố/mẹ hiểu là con đang cân nhắc rất nhiều thứ.
-                Mình cùng xem từng bước nhé.&rdquo;
-              </p>
-              <p>
-                Được thấu hiểu, con sẽ dám nói ra điều thật lòng — kể cả những
-                lo lắng tưởng như &ldquo;không đáng nói&rdquo; như sợ xa nhà,
-                sợ không theo kịp bạn bè hay sợ làm bố mẹ thất vọng. Khi cảm xúc
-                được gọi tên, con bớt căng thẳng và có thể quay lại việc so sánh
-                các lựa chọn một cách bình tĩnh hơn.
-              </p>
-              <p>
-                Hãy nhớ rằng phân vân không phải là dấu hiệu của sự yếu kém. Đó
-                là dấu hiệu con đang nghiêm túc với tương lai của mình. Cũng
-                đừng cho rằng chỉ những bạn học lực chưa tốt mới cần được tư
-                vấn: những bạn học khá cũng có thể mắc kẹt trong vòng xoáy
-                &ldquo;sợ bỏ lỡ lựa chọn tốt hơn&rdquo; và cần người lớn đồng
-                hành.
-              </p>
-              <div className="p-4 rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border border-[#EAF2D7] dark:border-slate-700 space-y-2">
-                <p className="font-semibold text-[#223A1E] dark:text-[#EAF2D7]">
-                  Bốn việc nhỏ bố mẹ có thể làm ngay:
-                </p>
-                <ul className="list-disc list-inside space-y-1.5">
-                  <li>Hỏi câu mở, không dẫn dắt, và cho con thời gian trả lời.</li>
-                  <li>Nhắc lại điều con vừa nói để con biết mình đang được lắng nghe.</li>
-                  <li>Tránh so sánh con với &ldquo;con nhà người ta&rdquo; hay với anh chị em.</li>
-                  <li>Giúp con đặt một mốc thời gian chốt nhẹ nhàng, thay vì thúc ép.</li>
-                </ul>
+          <article className="relative overflow-hidden bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl">
+            <div className="h-1.5 bg-gradient-to-r from-[#E27396] via-[#EA9AB2] to-[#B3DEE2]" />
+            <div className="p-6 sm:p-8 space-y-5">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#EFCFE3]/70 dark:bg-[#EFCFE3]/15 text-[#4A1A2C] dark:text-[#EFCFE3] flex items-center justify-center shrink-0">
+                  <HeartHandshake className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9D2950] dark:text-[#EA9AB2]">
+                    Bài đọc ngắn 1 dành cho Phụ huynh
+                  </p>
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug mt-1">
+                    VAI TRÒ CỦA SỰ ĐỒNG CẢM, THẤU HIỂU CỦA PHỤ HUYNH HỌC SINH
+                  </h2>
+                </div>
               </div>
-              <p className="font-medium text-[#133C42] dark:text-[#B3DEE2]">
-                Khi được thấu hiểu, con sẽ tự tin nói ra lí do và tự chịu trách
-                nhiệm với lựa chọn của mình. Đó là nền tảng bền vững hơn bất kỳ
-                quyết định nào do người lớn chọn thay.
-              </p>
+
+              <div className="space-y-3.5 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
+                <p>
+                  Khi con chạm ngưỡng năm cuối cấp, thứ con mong muốn đôi khi
+                  không nằm ở những chồng tài liệu về trường lớp hay ngành nghề,
+                  mà là cảm giác được thực sự lắng nghe. Ngay cả những học sinh
+                  có học lực khá, thậm chí giỏi, vẫn có thể loay hoay hàng tháng
+                  trời trước ngưỡng cửa các trường THPT công lập, đổi tới đổi
+                  lui nguyện vọng chỉ vì nỗi sợ chọn nhầm hoặc ám ảnh đánh mất
+                  một cơ hội rực rỡ hơn.
+                </p>
+                <p>
+                  Đồng cảm với con không đồng nghĩa với việc gật đầu trước mọi
+                  quyết định của con, mà là biết mở lòng lắng nghe khi con nói:
+                </p>
+
+                <div className="rounded-xl bg-[#EAF2D7]/60 dark:bg-[#EAF2D7]/10 border-l-4 border-[#8FB37C] px-4 py-3.5 space-y-1.5">
+                  <Quote className="w-4 h-4 text-[#5F7F4E] dark:text-[#EAF2D7]" />
+                  <p className="italic text-[#223A1E] dark:text-[#EAF2D7]">
+                    “Con chưa biết nên chọn trường nào”,
+                  </p>
+                  <p className="text-xs font-semibold text-[#5F7F4E] dark:text-[#EAF2D7]/80">
+                    bố mẹ có thể trả lời:
+                  </p>
+                  <p className="italic text-[#223A1E] dark:text-[#EAF2D7]">
+                    “Bố/mẹ hiểu con đang đứng trước quá nhiều điều phải cân
+                    nhắc. Mình cùng đi từng bước nhé.”
+                  </p>
+                </div>
+
+                <p>
+                  Một khi được thấu hiểu, con mới có thể giãi bày những tâm tư
+                  thầm kín nhất — từ những nỗi niềm tưởng chừng nhỏ nhặt như
+                  ngại cảnh xa nhà, lo hụt hơi trước bạn bè, cho đến nỗi sợ làm
+                  bố mẹ buồn lòng. Khi đó, lòng con lắng lại, nhường chỗ cho sự
+                  bình tĩnh và sáng suốt để đưa ra lựa chọn chín chắn.
+                </p>
+                <p>
+                  Sự chần chừ chưa bao giờ là thước đo của yếu đuối; trái lại,
+                  đó là minh chứng cho thấy con đang trân trọng và nghiêm túc
+                  với tương lai của chính mình. Cũng đừng vội nghĩ rằng chỉ
+                  những học sinh học lực chưa ổn định mới cần được định hướng:
+                  những bạn học tốt cũng dễ rơi vào vòng xoáy “sợ bỏ lỡ lựa
+                  chọn tốt hơn” và rất cần sự đồng hành từ phụ huynh.
+                </p>
+
+                <div className="rounded-2xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+                  <p className="flex items-center gap-2 font-bold text-[#1D242B] dark:text-white">
+                    <Lightbulb className="w-4 h-4 text-[#9D2950] dark:text-[#EA9AB2]" />
+                    <span>
+                      Sáu việc nhỏ bố mẹ có thể bắt tay thực hiện ngay hôm nay:
+                    </span>
+                  </p>
+                  <ol className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {PARENT_ARTICLE1_TIPS.map((tip, idx) => (
+                      <li
+                        key={tip}
+                        className="flex items-start gap-2.5 rounded-xl bg-white dark:bg-[#17222C] border border-slate-200/80 dark:border-slate-800 p-3 text-sm leading-relaxed"
+                      >
+                        <span
+                          className={`w-6 h-6 shrink-0 rounded-full text-[11px] font-bold flex items-center justify-center ${PARENT_TIP_TONES[idx % PARENT_TIP_TONES.length]}`}
+                        >
+                          {idx + 1}
+                        </span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
+                <p>
+                  Bố mẹ hãy dành thời gian trò chuyện cởi mở và thấu cảm, nhẹ
+                  nhàng khuyến khích con bật chế độ “Chia sẻ phụ huynh” bằng
+                  lời nhắn nhủ chân thành:
+                </p>
+
+                <div className="flex items-start gap-3 rounded-xl bg-[#EFCFE3]/50 dark:bg-[#EFCFE3]/10 border-l-4 border-[#E27396] px-4 py-3.5">
+                  <Quote className="w-4 h-4 mt-0.5 shrink-0 text-[#9D2950] dark:text-[#EA9AB2]" />
+                  <p className="italic text-[#4A1A2C] dark:text-[#EFCFE3]">
+                    “Nếu con sẵn sàng chia sẻ, bố mẹ sẽ có cơ hội hiểu con hơn
+                    và đồng hành cùng con một cách vừa vặn nhất.”
+                  </p>
+                </div>
+
+                <p>
+                  Sự kết nối này cần được đặt trọn trên nền tảng của sự tôn
+                  trọng, không mang sự kiểm soát hay áp đặt.
+                </p>
+                <p className="rounded-xl bg-[#B3DEE2]/35 dark:bg-[#B3DEE2]/10 border border-[#B3DEE2]/60 dark:border-slate-700 px-4 py-3 font-medium text-[#133C42] dark:text-[#B3DEE2]">
+                  Khi được thấu hiểu, con sẽ vững vàng cất lên tiếng nói của
+                  riêng mình và dám chịu trách nhiệm cho ngã rẽ sắp tới. Chính
+                  sự trưởng thành ấy mới là bệ phóng vững chắc hơn mọi quyết
+                  định sắp đặt sẵn từ người lớn.
+                </p>
+              </div>
             </div>
           </article>
 
-          <article className="bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-5">
-            <p className="text-xs font-semibold text-[#9D2950] dark:text-[#EA9AB2]">
-              Bài đọc ngắn 2 dành cho Phụ huynh
-            </p>
-            <h2 className="text-xl sm:text-2xl font-bold">
-              Vì sao nên để con tự nói lí do lựa chọn
-            </h2>
-            <div className="space-y-4 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
-              <p>
-                Ở tuổi 14–15, khi đứng trước nhiều ngã rẽ, nhiều em dễ chọn
-                trường theo lời bạn rủ hoặc làm theo sắp xếp của người lớn để
-                cho xong. Tuy nhiên, nếu con chọn một hướng đi mà chưa tự giải
-                thích được vì sao hợp với mình, con rất dễ nản lòng hoặc đổi ý
-                giữa chừng khi gặp môn học khó hoặc khi thấy bạn bè chọn hướng
-                khác.
-              </p>
-
-              <div className="space-y-2">
-                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                  1. Lợi ích tâm lý: con bớt lo, bố mẹ bớt sốt ruột
-                </h3>
-                <p>
-                  Khi được tự nói ra lí do, con cảm thấy lựa chọn này là của
-                  mình chứ không phải bị áp đặt. Cảm giác &ldquo;mình được kiểm
-                  soát&rdquo; giúp giảm lo âu, tăng tự tin và giảm hẳn những
-                  cuộc tranh luận lặp đi lặp lại trong gia đình. Bố mẹ cũng có
-                  thể yên tâm hơn vì hiểu rõ con đang dựa trên tiêu chí nào.
-                </p>
+          <article className="relative overflow-hidden bg-white dark:bg-[#17222C] border border-slate-200 dark:border-slate-800 rounded-2xl">
+            <div className="h-1.5 bg-gradient-to-r from-[#B3DEE2] via-[#EAF2D7] to-[#EA9AB2]" />
+            <div className="p-6 sm:p-8 space-y-5">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#B3DEE2]/60 dark:bg-[#B3DEE2]/15 text-[#133C42] dark:text-[#B3DEE2] flex items-center justify-center shrink-0">
+                  <MessageSquareHeart className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9D2950] dark:text-[#EA9AB2]">
+                    Bài đọc ngắn 2 dành cho Phụ huynh
+                  </p>
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug mt-1">
+                    VÌ SAO NÊN ĐỂ CON TỰ NÓI LÍ DO LỰA CHỌN
+                  </h2>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                  2. Học cách tự chịu trách nhiệm với quyết định
-                </h3>
+              <div className="space-y-3 text-sm sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
                 <p>
-                  Một lựa chọn do người lớn chọn thay thường đi kèm tâm thế
-                  &ldquo;tại bố mẹ bắt con chọn&rdquo; mỗi khi gặp khó khăn.
-                  Ngược lại, khi con tự viết lí do, con biết mình đã cân nhắc
-                  điều gì và sẵn sàng nhận phần trách nhiệm của mình. Đây là kĩ
-                  năng quan trọng không chỉ cho việc chọn trường mà còn cho
-                  nhiều quyết định sau này.
+                  Ở độ tuổi 14–15, khi đứng trước những ngã rẽ đầu bỡ ngỡ, nhiều
+                  học sinh dễ chọn trường theo lời rủ rê của bạn bè hay nương
+                  theo sự sắp đặt sẵn có của người lớn. Thế nhưng, nếu bước lên
+                  một con đường mà bản thân chưa thể lý giải vì sao nó thuộc về
+                  mình, con sẽ rất dễ chùn bước, nản lòng hoặc đổi hướng giữa
+                  chừng ngay khi chạm trán những thử thách đầu tiên.
                 </p>
-              </div>
 
-              <div className="space-y-2">
-                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                  3. Nhận diện mong muốn và tiêu chí thật sự của con
-                </h3>
-                <p>
-                  Khi con viết ra lí do, bố mẹ sẽ thấy điều con thật sự quan
-                  tâm — có thể là học phí, khoảng cách, môi trường bạn bè, cơ
-                  hội học tiếp hay một ước mơ riêng. Đôi khi tiêu chí của con
-                  khác với điều bố mẹ tưởng. Đây là lúc để cùng con làm rõ:
-                  &ldquo;Điều gì là quan trọng nhất với con?&rdquo;,
-                  &ldquo;Con sẵn sàng đánh đổi điều gì?&rdquo;,
-                  &ldquo;Nếu chỉ được giữ một tiêu chí, con sẽ giữ tiêu chí
-                  nào?&rdquo;
-                </p>
-              </div>
+                <div className="rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-[#E27396]/25 dark:bg-[#E27396]/25 text-[#9D2950] dark:text-[#EA9AB2] text-xs font-bold flex items-center justify-center">
+                      1
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-[#9D2950] dark:text-[#EA9AB2]">
+                      Điểm tựa tâm lý: Con vơi âu lo, bố mẹ nguôi sốt ruột
+                    </h3>
+                  </div>
+                  <p>
+                    Khi được tự mình nói lý do, con sẽ cảm nhận trọn vẹn rằng
+                    quyết định này là của chính mình, chứ không phải một sự áp
+                    đặt từ bên ngoài. Cảm giác được làm chủ hành trình giúp xoa
+                    dịu những bất an, thắp lên sự tự tin và hóa giải những cuộc
+                    tranh luận căng thẳng không đáng có. Về phía bố mẹ, lòng
+                    cũng nhẹ nhõm và an tâm hơn khi thấu tỏ những thước đo mà
+                    con đang thực sự dựa vào.
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                  4. Lắng nghe thay vì nói thay hoặc áp đặt
-                </h3>
-                <p>
-                  Lắng nghe không có nghĩa là im lặng hoàn toàn. Bố mẹ vẫn có
-                  thể chia sẻ hiểu biết và mối lo của mình, nhưng nên tách phần
-                  &ldquo;thông tin&rdquo; khỏi phần &ldquo;quyết định thay
-                  con&rdquo;. Một vài phản xạ nên tránh:
-                </p>
-                <ul className="list-disc list-inside space-y-1.5">
-                  <li>
-                    Nói thay: &ldquo;Con phải chọn trường này, bố mẹ đã tính
-                    rồi.&rdquo;
-                  </li>
-                  <li>
-                    Phủ nhận cảm xúc: &ldquo;Có gì mà phải phân vân, chuyện nhỏ
-                    thôi.&rdquo;
-                  </li>
-                  <li>
-                    So sánh: &ldquo;Sao con không được như bạn A?&rdquo;
-                  </li>
-                  <li>
-                    Dọa dẫm: &ldquo;Chọn sai là đời con hỏng đấy.&rdquo;
-                  </li>
-                </ul>
-                <p>
-                  Thay vào đó, bố mẹ có thể phản hồi theo hướng đồng hành:
-                  &ldquo;Bố/mẹ nghe con nói là con thích trường này vì gần nhà
-                  và có môn con giỏi. Mình thử so thêm với trường kia xem sao,
-                  rồi con quyết định nhé.&rdquo;
-                </p>
-              </div>
+                <div className="rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-[#B3DEE2]/60 dark:bg-[#B3DEE2]/20 text-[#133C42] dark:text-[#B3DEE2] text-xs font-bold flex items-center justify-center">
+                      2
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
+                      Tập dượt bản lĩnh tự chịu trách nhiệm với quyết định của
+                      mình
+                    </h3>
+                  </div>
+                  <p>
+                    Một ngã rẽ do người lớn chọn thay thường vô tình gieo vào
+                    lòng trẻ tâm thế đổ lỗi <em>“tại bố mẹ bắt con chọn”</em>{" "}
+                    mỗi khi vấp ngã. Trái lại, khi tự tay viết xuống những lý do
+                    của riêng mình, con hiểu rõ bản thân đã cân nhắc những gì và
+                    sẵn sàng đón nhận phần trách nhiệm đi kèm. Đó không chỉ là
+                    hành trang cho kỳ chuyển cấp trước mắt, mà còn là bản lĩnh
+                    sống quý giá theo con suốt những lựa chọn lớn lao sau này.
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <h3 className="text-base font-bold text-[#133C42] dark:text-[#B3DEE2]">
-                  5. Khi con đổi ý, hãy coi đó là một bước học
-                </h3>
-                <p>
-                  Việc con thay đổi nguyện vọng vài lần không nhất thiết là dấu
-                  hiệu xấu. Đó có thể là quá trình con đang học cách so sánh và
-                  tự điều chỉnh. Điều quan trọng là bố mẹ giúp con nhận ra vì
-                  sao mình đổi ý, điều gì mới được khám phá, và cuối cùng con
-                  chốt dựa trên tiêu chí nào. Như vậy, mỗi lần đổi ý đều trở
-                  thành một bước tiến thay vì một thất bại.
-                </p>
-              </div>
+                <div className="rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-[#EFCFE3] dark:bg-[#EFCFE3]/20 text-[#4A1A2C] dark:text-[#EFCFE3] text-xs font-bold flex items-center justify-center">
+                      3
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-[#4A1A2C] dark:text-[#EFCFE3]">
+                      Khai mở khát vọng và những tiêu chí thầm kín nơi con
+                    </h3>
+                  </div>
+                  <p>
+                    Từng dòng lý do con viết ra chính là tấm gương phản chiếu
+                    điều con thực sự trân trọng, có thể là quãng đường đến
+                    trường vừa sức, một môi trường học tập cởi mở, tình bạn gắn
+                    bó, cơ hội vươn xa hay một giấc mơ riêng chưa từng ngỏ lời.
+                    Đôi khi, tiêu chí của con lại rất khác với những gì bố mẹ
+                    mong muốn. Đây chính là khoảnh khắc quý giá để bố mẹ ngồi
+                    lại, cùng con trò chuyện qua những câu hỏi gợi mở:
+                  </p>
+                  <div className="rounded-xl bg-[#EFCFE3]/50 dark:bg-[#EFCFE3]/10 border-l-4 border-[#E27396] px-4 py-3 space-y-1 text-sm italic text-[#4A1A2C] dark:text-[#EFCFE3]">
+                    <p>
+                      “Điều gì mới thực sự là quan trọng nhất với con?”
+                    </p>
+                    <p>
+                      “Nếu chỉ được giữ lại một tiêu chí duy nhất, con sẽ chọn
+                      điều gì?”
+                    </p>
+                  </div>
+                </div>
 
-              <p className="font-medium text-[#133C42] dark:text-[#B3DEE2]">
-                Sự đồng thuận từ bên trong giúp con đi bền hơn nhiều so với một
-                lựa chọn bị ép buộc. Khi con được tự nói lí do, con không chỉ
-                chọn được trường phù hợp mà còn học được cách tin vào chính
-                mình.
-              </p>
+                <div className="rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-[#EAF2D7] dark:bg-[#EAF2D7]/20 text-[#223A1E] dark:text-[#EAF2D7] text-xs font-bold flex items-center justify-center">
+                      4
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-[#223A1E] dark:text-[#EAF2D7]">
+                      Tạo cơ sở để bố mẹ đồng hành cùng con đúng cách
+                    </h3>
+                  </div>
+                  <p>
+                    Khi con tự mình lý giải cho những lựa chọn của bản thân, bố
+                    mẹ sẽ hiểu được những nguyện vọng, suy tư và cả những trăn
+                    trở của con. Từ điểm chạm thấu hiểu ấy, bố mẹ có thể trao đi
+                    những lời khuyên vừa vặn, bồi đắp thêm thông tin còn thiếu
+                    và giúp con mở rộng tầm nhìn đa chiều, thay vì dùng mong
+                    muốn để áp đặt lên bước đường của con. Sự lắng nghe và gợi
+                    mở này không chỉ vun đắp nên nhịp cầu đồng thuận giữa hai
+                    thế hệ, mà còn giữ sự tự chủ để con tự tin cầm lái trên hành
+                    trình định hướng tương lai.
+                  </p>
+                </div>
+              </div>
             </div>
           </article>
         </section>

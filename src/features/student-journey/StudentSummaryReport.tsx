@@ -274,7 +274,7 @@ export const StudentSummaryReport: React.FC<StudentSummaryReportProps> = ({
               <div className="rounded-lg bg-white/80 dark:bg-[#17222C] border border-slate-200/70 dark:border-slate-800 p-3 space-y-2">
                 <p className="text-[11px] font-bold text-[#4A1A2C] dark:text-[#EFCFE3] flex items-center gap-1.5">
                   <PenLine className="w-3.5 h-3.5" />
-                  3. Nhật ký thông minh &amp; Phiếu cảm nhận 3 câu
+                  3. Nhật ký thông minh &amp; Phiếu cảm nhận
                 </p>
                 {summary.steps.tryDetails.journalEntries.length === 0 ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400 italic inline-flex items-center gap-1.5">

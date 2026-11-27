@@ -93,8 +93,8 @@ export interface Profile {
   conditions: {
     commuteDistance: string;
     familyFinance: string;
-    earlyIndependence: string;
     healthNote: string;
+    otherConditions: string;
   };
 }
 
@@ -352,6 +352,8 @@ export interface Experience {
   location: string;
   description: string;
   pathwayId?: string;
+  /** Nhóm lộ trình được gợi ý hoạt động: THPT hoặc giáo dục nghề nghiệp */
+  audience?: "thpt" | "vocational";
 }
 
 export type AIMessageStatus =

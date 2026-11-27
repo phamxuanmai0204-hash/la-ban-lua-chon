@@ -8,6 +8,7 @@ import {
   formatPasswordError,
   formatPinError,
   formatUsernameError,
+  normalizePassword,
   normalizeUsername,
   usernameKey,
   validateLoginInput,
@@ -32,6 +33,10 @@ const DATA_DIR = path.join(process.cwd(), ".data");
 const ACCOUNTS_FILE = path.join(DATA_DIR, "auth-accounts.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "auth-sessions.json");
 const STUDENT_RECORDS_FILE = path.join(DATA_DIR, "student-records.json");
+const LEGACY_STUDENT_RESET_MARKER = path.join(
+  DATA_DIR,
+  "legacy-students-reset-v2.done"
+);
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_PATTERN = /^\d{4}$/;
 
@@ -238,6 +243,88 @@ async function ensureHomeroomTeacherAccount(): Promise<void> {
   }
 }
 
+/**
+ * Xóa một lần toàn bộ dữ liệu học sinh của các phiên bản trước (tài khoản,
+ * phiên đăng nhập, hồ sơ gửi lên) để danh sách Lớp 9 bắt đầu sạch. Marker
+ * đảm bảo chỉ chạy đúng một lần, không xóa tài khoản do người dùng tạo sau đó.
+ */
+async function resetLegacyStudentDataOnce(): Promise<void> {
+  try {
+    await fs.access(LEGACY_STUDENT_RESET_MARKER);
+    return;
+  } catch {
+    // Chưa reset lần nào — tiếp tục.
+  }
+
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupDir = path.join(DATA_DIR, `backup-before-reset-${stamp}`);
+    await fs.mkdir(backupDir, { recursive: true });
+    await Promise.all(
+      [ACCOUNTS_FILE, SESSIONS_FILE, STUDENT_RECORDS_FILE].map(async (file) => {
+        try {
+          await fs.copyFile(file, path.join(backupDir, path.basename(file)));
+        } catch {
+          // File có thể chưa tồn tại.
+        }
+      })
+    );
+
+    const accounts = await accountsStore.read();
+    const studentIds = new Set(
+      accounts
+        .filter((account) => account.role === "student")
+        .map((account) => account.id)
+    );
+
+    const remaining = accounts.filter((account) => account.role !== "student");
+    const nextAccounts = remaining.map((account) => {
+      if (account.role !== "parent") return account;
+      // Reset xóa toàn bộ học sinh cũ nên liên kết con (kể cả mã học sinh mẫu
+      // kiểu "hs-06" của bản cũ) đều treo lơ lửng và phải bỏ.
+      const linked = account.linkedChildren ?? [];
+      return linked.length === 0
+        ? account
+        : { ...account, linkedChildren: [] };
+    });
+    if (JSON.stringify(nextAccounts) !== JSON.stringify(accounts)) {
+      await accountsStore.replace(nextAccounts);
+    }
+
+    if (studentIds.size > 0) {
+      const sessions = await sessionsStore.read();
+      const nextSessions = sessions.filter(
+        (session) => !studentIds.has(session.userId)
+      );
+      if (nextSessions.length !== sessions.length) {
+        await sessionsStore.replace(nextSessions);
+      }
+    }
+
+    const records = await recordsStore.read();
+    if (records.length > 0) {
+      await recordsStore.replace([]);
+    }
+
+    await fs.writeFile(
+      LEGACY_STUDENT_RESET_MARKER,
+      JSON.stringify(
+        {
+          completedAt: new Date().toISOString(),
+          removedStudentAccounts: studentIds.size,
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+  } catch (err) {
+    // Không ghi marker để lần khởi động sau thử lại.
+    console.error("Không thể reset dữ liệu học sinh cũ:", err);
+  }
+}
+
 function getBearerToken(req: Request): string | null {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return null;
@@ -422,10 +509,17 @@ function readString(
 
 export async function registerAuthRoutes(app: Express): Promise<void> {
   await ensureHomeroomTeacherAccount();
+  await resetLegacyStudentDataOnce();
 
   app.post("/api/auth/register", async (req, res) => {
     const input = parseRegisterBody(req);
-    const issue = validateRegisterInput(input);
+    const trimmedInput: RegisterAccountInput = {
+      ...input,
+      username: normalizeUsername(input.username),
+      password: normalizePassword(input.password),
+      confirmPassword: normalizePassword(input.confirmPassword),
+    };
+    const issue = validateRegisterInput(trimmedInput);
     if (issue) {
       res.status(400).json({
         error: issue.message,
@@ -434,7 +528,7 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
       });
       return;
     }
-    if (input.role !== "student" && input.role !== "parent") {
+    if (trimmedInput.role !== "student" && trimmedInput.role !== "parent") {
       res.status(403).json({
         error:
           "Chỉ tài khoản Học sinh và Phụ huynh được tự đăng ký. Tài khoản Giáo viên chủ nhiệm do nhà trường cấp sẵn.",
@@ -444,7 +538,7 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
       return;
     }
 
-    const username = normalizeUsername(input.username);
+    const username = normalizeUsername(trimmedInput.username);
     const key = usernameKey(username);
     const accounts = await accountsStore.read();
     if (accounts.some((account) => account.usernameKey === key)) {
@@ -461,13 +555,16 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
     let parentPin: string | undefined;
     let linkedChildren: LinkedChild[] | undefined;
 
-    if (input.role === "student") {
+    if (trimmedInput.role === "student") {
       className = DEFAULT_CLASS_ID;
       parentPin = generateParentPin();
     }
 
-    if (input.role === "parent") {
-      const child = resolveChild(accounts, input.childStudentId ?? "");
+    if (trimmedInput.role === "parent") {
+      const child = resolveChild(
+        accounts,
+        trimmedInput.childStudentId ?? ""
+      );
       if (!child) {
         res.status(400).json({
           error:
@@ -477,7 +574,13 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
         });
         return;
       }
-      if (!verifyChildPin(accounts, child, input.childPin?.trim() ?? "")) {
+      if (
+        !verifyChildPin(
+          accounts,
+          child,
+          trimmedInput.childPin?.trim() ?? ""
+        )
+      ) {
         res.status(403).json({
           error:
             "Mã PIN chưa đúng nên chưa thể liên kết. Vui lòng hỏi lại con mã PIN 4 số.",
@@ -494,18 +597,18 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
     const salt = crypto.randomBytes(16).toString("hex");
     const account: StoredAccount = {
       id: crypto.randomUUID(),
-      fullName: input.fullName.trim(),
-      role: input.role,
+      fullName: trimmedInput.fullName.trim(),
+      role: trimmedInput.role,
       username,
       usernameKey: key,
-      passwordHash: hashPassword(input.password, salt),
+      passwordHash: hashPassword(trimmedInput.password, salt),
       salt,
       createdAt: new Date().toISOString(),
       className,
       parentPin,
       linkedChildren,
       homeroomTeacherUsername:
-        input.role === "student" ? HOMEROOM_TEACHER.username : undefined,
+        trimmedInput.role === "student" ? HOMEROOM_TEACHER.username : undefined,
     };
 
     await accountsStore.replace([...accounts, account]);
@@ -515,7 +618,9 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
 
   app.post("/api/auth/login", async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const username = typeof body.username === "string" ? body.username : "";
+    const username = normalizeUsername(
+      typeof body.username === "string" ? body.username : ""
+    );
     const password = typeof body.password === "string" ? body.password : "";
 
     const issue = validateLoginInput({ username, password });
@@ -533,10 +638,15 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
       (item) => item.usernameKey === key
     );
 
-    if (
-      !account ||
-      !verifyPassword(password, account.salt, account.passwordHash)
-    ) {
+    const trimmedPassword = normalizePassword(password);
+    const passwordMatches = Boolean(
+      account &&
+        (verifyPassword(trimmedPassword, account.salt, account.passwordHash) ||
+          (trimmedPassword !== password &&
+            verifyPassword(password, account.salt, account.passwordHash)))
+    );
+
+    if (!account || !passwordMatches) {
       res.status(401).json({
         error: "Tên đăng nhập hoặc mật khẩu không đúng.",
         code: "INVALID_CREDENTIALS",
@@ -722,7 +832,7 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const fullName = readString(body, "fullName").trim();
     const username = normalizeUsername(readString(body, "username"));
-    const password = readString(body, "password");
+    const password = normalizePassword(readString(body, "password"));
     const parentPin = readString(body, "parentPin").trim();
 
     const fullNameError = formatFullNameError(fullName);
@@ -819,7 +929,7 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
     const fullName = readString(body, "fullName").trim();
     const username = normalizeUsername(readString(body, "username"));
     const parentPin = readString(body, "parentPin").trim();
-    const newPassword = readString(body, "newPassword");
+    const newPassword = normalizePassword(readString(body, "newPassword"));
 
     const fullNameError = formatFullNameError(fullName);
     if (fullNameError) {

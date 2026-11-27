@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Users,
   MessageSquareText,
@@ -33,7 +33,7 @@ import { ThreePartyMeeting } from "./ThreePartyMeeting";
 import { StudentTimeline } from "./StudentTimeline";
 import { StudentAccountsManager } from "./StudentAccountsManager";
 import { StudentSummaryReport } from "../student-journey/StudentSummaryReport";
-import { describeBehavioralSignals, JOURNEY_STEPS } from "../../data/mockData";
+import { describeBehavioralSignals, JOURNEY_STEPS, createStudentProfile } from "../../data/mockData";
 import {
   SCHOOL_CLASSES,
   DEFAULT_CLASS_ID,
@@ -41,6 +41,10 @@ import {
 } from "../../data/schoolClasses";
 import { requestTeacherJourneySummary } from "../../services/ai";
 import { fetchStudentRecords } from "../../services/studentRecords";
+import {
+  listStudentAccounts,
+  type StudentAccountSummary,
+} from "../../services/auth";
 import type {
   AIMessage,
   AIModerationAction,
@@ -137,6 +141,9 @@ interface TeacherDashboardProps {
   onLogout?: () => void;
   onStudentAccountRenamed?: (accountId: string, fullName: string) => void;
   onStudentAccountDeleted?: (accountId: string) => void;
+  onEnsureStudentProfiles?: (
+    accounts: { id: string; fullName: string; className: string }[]
+  ) => void;
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
@@ -155,6 +162,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onLogout,
   onStudentAccountRenamed,
   onStudentAccountDeleted,
+  onEnsureStudentProfiles,
 }) => {
   const {
     students: allStudents,
@@ -184,13 +192,62 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     };
   }, [authSession, offlineSession]);
 
+  // Nguồn duy nhất cho danh sách Lớp 9 là tài khoản học sinh trên hệ thống.
+  const [accountList, setAccountList] = useState<StudentAccountSummary[] | null>(
+    null
+  );
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+
+  const reloadAccounts = useCallback(async () => {
+    if (!authSession || authSession.user.role !== "teacher") {
+      setAccountList([]);
+      setAccountsLoading(false);
+      return;
+    }
+    setAccountsLoading(true);
+    setAccountsError(null);
+    try {
+      const list = await listStudentAccounts(authSession);
+      setAccountList(list);
+      onEnsureStudentProfiles?.(
+        list.map((item) => ({
+          id: item.id,
+          fullName: item.fullName,
+          className: item.className,
+        }))
+      );
+    } catch (err) {
+      setAccountsError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được danh sách tài khoản học sinh."
+      );
+      setAccountList([]);
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, [authSession, onEnsureStudentProfiles]);
+
+  useEffect(() => {
+    void reloadAccounts();
+  }, [reloadAccounts]);
+
   const students = useMemo(() => {
-    const byId = new Map(allStudents.map((s) => [s.id, s]));
+    if (!accountList) return [];
+    const byId = new Map<string, Student>();
+    for (const student of allStudents) byId.set(student.id, student);
     for (const remote of remoteStudents) byId.set(remote.id, remote);
-    return Array.from(byId.values()).filter(
-      (s) => s.className === selectedClass
-    );
-  }, [allStudents, remoteStudents, selectedClass]);
+    return accountList
+      .filter((item) => item.className === selectedClass)
+      .map((item) => {
+        const id = `acc:${item.id}`;
+        return (
+          byId.get(id) ??
+          createStudentProfile(id, item.fullName, item.className)
+        );
+      });
+  }, [accountList, allStudents, remoteStudents, selectedClass]);
 
   const [activeTab, setActiveTab] = useState<TeacherTab>("class");
   const [classViewMode, setClassViewMode] = useState<"board" | "table">(
@@ -254,6 +311,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const openedStudent = openedStudentId
     ? students.find((s) => s.id === openedStudentId) || null
     : null;
+
+  const handleAccountSaved = (saved: StudentAccountSummary) => {
+    setAccountList((prev) =>
+      [...(prev ?? []).filter((item) => item.id !== saved.id), saved].sort(
+        (a, b) => a.fullName.localeCompare(b.fullName, "vi")
+      )
+    );
+    onEnsureStudentProfiles?.([
+      { id: saved.id, fullName: saved.fullName, className: saved.className },
+    ]);
+  };
+
+  const handleAccountUpdated = (saved: StudentAccountSummary) => {
+    handleAccountSaved(saved);
+    onStudentAccountRenamed?.(saved.id, saved.fullName);
+  };
+
+  const handleAccountDeleted = (removed: StudentAccountSummary) => {
+    setAccountList((prev) =>
+      (prev ?? []).filter((item) => item.id !== removed.id)
+    );
+    onStudentAccountDeleted?.(removed.id);
+  };
 
   const handleGenerateJourneySummary = async (stu: Student) => {
     setSummaryError(null);
@@ -488,7 +568,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </select>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 dark:bg-[#0F171E] border border-slate-200 dark:border-slate-700 px-3 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
               <Users className="w-3.5 h-3.5 text-[#133C42] dark:text-[#B3DEE2]" />
-              {allStudents.length} học sinh toàn khối · {students.length} em lớp này
+              {accountList?.length ?? 0} học sinh Lớp 9 · {students.length} em
+              đang hiển thị
             </span>
             {sensitiveCount > 0 && (
               <button
@@ -1500,12 +1581,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <StudentAccountsManager
                 session={authSession ?? null}
                 students={students}
-                onStudentRenamed={(accountId, fullName) =>
-                  onStudentAccountRenamed?.(accountId, fullName)
-                }
-                onStudentDeleted={(accountId) =>
-                  onStudentAccountDeleted?.(accountId)
-                }
+                accounts={accountList ?? []}
+                loading={accountsLoading}
+                loadError={accountsError}
+                onReload={() => void reloadAccounts()}
+                onStudentCreated={handleAccountSaved}
+                onStudentUpdated={handleAccountUpdated}
+                onStudentDeleted={handleAccountDeleted}
               />
             )}
 
