@@ -693,6 +693,15 @@ export async function createStudentAccount(
   const password = validatePassword(input.password);
   const parentPin = validateOptionalPin(input.parentPin);
 
+  // A session restored from the device mirror never syncs by itself; creating an
+  // account from it would make the student phone-only invisible to other devices.
+  if (isOnline() && session.token.startsWith("local-")) {
+    throw new AuthError(
+      "Phiên đăng nhập của thầy/cô đang dùng bản lưu ngoại tuyến trên thiết bị này. Nếu tạo ngay, học sinh chỉ đăng nhập được trên máy tính này. Hãy đăng xuất, đăng nhập lại khi có mạng rồi tạo tài khoản để dùng được cả trên điện thoại.",
+      { code: "SESSION_NOT_SYNCED", field: "form" }
+    );
+  }
+
   if (isOnline() && !session.token.startsWith("local-")) {
     try {
       const payload = await apiRequest<{ account?: StudentAccountSummary }>(
@@ -1132,6 +1141,7 @@ export async function loginAccount(
   };
 
   let remoteRejection: AuthError | null = null;
+  let networkError = !isOnline();
 
   if (isOnline()) {
     try {
@@ -1157,6 +1167,8 @@ export async function loginAccount(
     } catch (err) {
       if (err instanceof AuthError) {
         remoteRejection = err;
+      } else {
+        networkError = true;
       }
     }
   }
@@ -1168,13 +1180,47 @@ export async function loginAccount(
     return { session: localSession, savedOffline: true };
   }
 
+  const localAccounts = readLocalAccounts();
+  const displayUsername = normalized.username;
+  const hasLocalUsername = localAccounts.some(
+    (account) => account.usernameKey === usernameKey(displayUsername)
+  );
+
   if (remoteRejection) {
+    if (remoteRejection.code === "ACCOUNT_NOT_FOUND") {
+      throw new AuthError(
+        hasLocalUsername
+          ? `Tài khoản “${displayUsername}” chưa có trên máy chủ nhưng có bản lưu trên thiết bị này. Tài khoản trên máy chủ có thể đã bị mất sau một lần khởi động lại/triển khai mới — hãy nhờ giáo viên tạo lại để đăng nhập được trên thiết bị khác.`
+          : `Tài khoản “${displayUsername}” chưa được lưu trên máy chủ lẫn thiết bị này. Hãy kiểm tra lại tên đăng nhập/email (không phân biệt chữ hoa/thường), hoặc nhờ giáo viên kiểm tra và tạo lại tài khoản.`,
+        { code: "ACCOUNT_NOT_FOUND", field: "username" }
+      );
+    }
+    if (remoteRejection.code === "INVALID_CREDENTIALS") {
+      throw new AuthError(
+        hasLocalUsername
+          ? `Mật khẩu chưa đúng cho tài khoản “${displayUsername}” (cả trên máy chủ và bản lưu trên thiết bị). Mật khẩu phân biệt chữ hoa/thường và không tính khoảng trắng hai đầu.`
+          : `Mật khẩu chưa đúng cho tài khoản “${displayUsername}”. Mật khẩu phân biệt chữ hoa/thường; nếu nhập trên điện thoại, hãy kiểm tra bàn phím có tự viết hoa kí tự đầu không, hoặc nhờ giáo viên đặt lại mật khẩu.`,
+        { code: "INVALID_CREDENTIALS", field: "password" }
+      );
+    }
     throw remoteRejection;
   }
 
-  if (readLocalAccounts().length === 0) {
+  if (networkError) {
+    if (localAccounts.length === 0) {
+      throw new AuthError(
+        "Không kết nối được máy chủ và thiết bị này chưa lưu tài khoản nào. Hãy kiểm tra Wi‑Fi/4G rồi thử lại.",
+        { code: "AUTH_UNAVAILABLE", field: "form" }
+      );
+    }
+    if (hasLocalUsername) {
+      throw new AuthError(
+        `Mật khẩu không khớp với bản lưu trên thiết bị cho tài khoản “${displayUsername}”. Hãy kiểm tra chữ hoa/thường và khoảng trắng, hoặc kết nối mạng để máy chủ kiểm tra lại.`,
+        { code: "INVALID_CREDENTIALS", field: "password" }
+      );
+    }
     throw new AuthError(
-      "Không kết nối được máy chủ và thiết bị chưa lưu tài khoản nào. Vui lòng kiểm tra mạng rồi thử lại.",
+      `Không kết nối được máy chủ nên chưa thể đăng nhập tài khoản “${displayUsername}”. Tài khoản này chưa được lưu trên thiết bị này — hãy kiểm tra mạng, hoặc đăng nhập trên thiết bị đã tạo tài khoản để kiểm tra.`,
       { code: "AUTH_UNAVAILABLE", field: "form" }
     );
   }

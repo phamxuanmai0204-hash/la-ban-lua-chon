@@ -445,7 +445,7 @@ export const StudentAccountsManager: React.FC<
             setNotice({
               tone: savedOffline ? "warning" : "success",
               text: savedOffline
-                ? `Đã lưu tài khoản ${account.fullName} trên thiết bị này (chưa đồng bộ máy chủ). Mã PIN phụ huynh: ${account.parentPin}.`
+                ? `Đã lưu tài khoản ${account.fullName} trên thiết bị này (chưa đồng bộ máy chủ) nên tài khoản chỉ đăng nhập được trên máy tính này, không đăng nhập được trên điện thoại. Mã PIN phụ huynh: ${account.parentPin}. Để đồng bộ, thầy/cô đăng xuất, đăng nhập lại khi có mạng rồi tạo lại tài khoản.`
                 : `Đã tạo tài khoản ${account.fullName}. Mã PIN phụ huynh: ${account.parentPin}.`,
             });
           }}

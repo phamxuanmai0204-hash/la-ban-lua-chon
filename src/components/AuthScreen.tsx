@@ -430,7 +430,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <input
                       id="login-username"
                       type="text"
+                      inputMode="text"
                       autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={loginUsername}
                       onChange={(e) => {
                         setLoginUsername(e.target.value);
@@ -464,6 +468,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       id="login-password"
                       type={showLoginPassword ? "text" : "password"}
                       autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={loginPassword}
                       onChange={(e) => {
                         setLoginPassword(e.target.value);
@@ -758,7 +765,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <input
                       id="register-username"
                       type="text"
+                      inputMode="text"
                       autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={registerUsername}
                       onChange={(e) => {
                         setRegisterUsername(e.target.value);

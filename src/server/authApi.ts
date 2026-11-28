@@ -29,7 +29,9 @@ import type {
   Student,
 } from "../types.ts";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(process.cwd(), ".data");
 const ACCOUNTS_FILE = path.join(DATA_DIR, "auth-accounts.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "auth-sessions.json");
 const STUDENT_RECORDS_FILE = path.join(DATA_DIR, "student-records.json");
@@ -508,6 +510,11 @@ function readString(
 }
 
 export async function registerAuthRoutes(app: Express): Promise<void> {
+  if (process.env.NODE_ENV === "production" && !process.env.DATA_DIR) {
+    console.warn(
+      `[auth] Tài khoản đang lưu tại ${DATA_DIR}. Trên nền tảng như Render, thư mục này là ổ đĩa tạm và sẽ mất khi triển khai lại — hãy gắn Persistent Disk và đặt biến môi trường DATA_DIR trỏ vào thư mục đó.`
+    );
+  }
   await ensureHomeroomTeacherAccount();
   await resetLegacyStudentDataOnce();
 
@@ -638,19 +645,28 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
       (item) => item.usernameKey === key
     );
 
+    if (!account) {
+      res.status(401).json({
+        error:
+          "Tài khoản này chưa được lưu trên máy chủ. Nếu tài khoản vừa được tạo trong lúc máy chủ khởi động lại hoặc sau khi triển khai bản mới, hãy nhờ giáo viên tạo lại tài khoản. Hãy kiểm tra thêm tên đăng nhập/email (so khớp không phân biệt chữ hoa/thường).",
+        code: "ACCOUNT_NOT_FOUND",
+        field: "username",
+      });
+      return;
+    }
+
     const trimmedPassword = normalizePassword(password);
     const passwordMatches = Boolean(
-      account &&
-        (verifyPassword(trimmedPassword, account.salt, account.passwordHash) ||
-          (trimmedPassword !== password &&
-            verifyPassword(password, account.salt, account.passwordHash)))
+      verifyPassword(trimmedPassword, account.salt, account.passwordHash) ||
+        (trimmedPassword !== password &&
+          verifyPassword(password, account.salt, account.passwordHash))
     );
 
-    if (!account || !passwordMatches) {
+    if (!passwordMatches) {
       res.status(401).json({
-        error: "Tên đăng nhập hoặc mật khẩu không đúng.",
+        error: `Mật khẩu chưa đúng cho tài khoản “${account.username}”. Mật khẩu phân biệt chữ hoa/thường — hãy nhập chính xác như lúc tạo tài khoản hoặc nhờ giáo viên đặt lại mật khẩu.`,
         code: "INVALID_CREDENTIALS",
-        field: "form",
+        field: "password",
       });
       return;
     }
