@@ -9,53 +9,60 @@ import {
   RotateCcw,
   Download,
   Upload,
+  RefreshCw,
+  WifiOff,
+  AlertTriangle,
 } from "lucide-react";
-import {
-  CURRENT_SCHEMA_VERSION,
-  loadSavedFirebaseSettings,
-} from "../services/storage";
+import { CURRENT_SCHEMA_VERSION } from "../services/storage";
 import {
   exportFullAppStateJSON,
   parseFullAppStateJSON,
 } from "../services/export";
-import type { AppState, FirebaseConfig } from "../types";
+import type { WorkspaceSyncStatus } from "../hooks/useWorkspaceSync";
+import type { CloudStorageKind } from "../services/workspaceSync";
+import type { AppState } from "../types";
 
 interface SettingsModalProps {
   open: boolean;
   appState: AppState;
-  activeStorageKind: "local" | "firebase";
   schemaVersion: number;
+  signedIn: boolean;
+  syncStatus: WorkspaceSyncStatus;
+  cloudStorageKind: CloudStorageKind | null;
+  lastSyncedAt: number | null;
   requireTeacherApprovalBeforeDisplay: boolean;
   onToggleRequireApproval: () => void;
   onResetSampleData: () => void;
   onImportFullAppState: (nextState: AppState) => void;
   onClose: () => void;
-  onApplyFirebaseConfig: (
-    enabled: boolean,
-    config: FirebaseConfig | null
-  ) => Promise<void>;
+}
+
+function formatSyncedAt(value: number | null): string {
+  if (!value) return "Chưa đồng bộ";
+  return new Date(value).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   open,
   appState,
-  activeStorageKind,
   schemaVersion,
+  signedIn,
+  syncStatus,
+  cloudStorageKind,
+  lastSyncedAt,
   requireTeacherApprovalBeforeDisplay,
   onToggleRequireApproval,
   onResetSampleData,
   onImportFullAppState,
   onClose,
-  onApplyFirebaseConfig,
 }) => {
-  const saved = loadSavedFirebaseSettings();
-  const [configJson, setConfigJson] = useState<string>(
-    saved.config ? JSON.stringify(saved.config, null, 2) : ""
-  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [saving, setSaving] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -63,44 +70,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [open]);
 
   if (!open) return null;
-
-  const handleEnableFirebase = async () => {
-    setErrorMessage(null);
-    setStatusMessage(null);
-    try {
-      const parsed = JSON.parse(configJson) as Partial<FirebaseConfig>;
-      if (
-        !parsed.apiKey ||
-        !parsed.projectId ||
-        !parsed.appId ||
-        !parsed.authDomain
-      ) {
-        setErrorMessage(
-          "Cấu hình cần đủ các trường: apiKey, authDomain, projectId, appId."
-        );
-        return;
-      }
-      setSaving(true);
-      await onApplyFirebaseConfig(true, parsed as FirebaseConfig);
-      setStatusMessage(
-        "Đã kích hoạt bộ chuyển đổi FirebaseStorage (Firestore) và đồng bộ dữ liệu hiện tại."
-      );
-    } catch {
-      setErrorMessage(
-        "Chuỗi cấu hình chưa đúng định dạng JSON hợp lệ. Hãy kiểm tra lại dấu ngoặc kép."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUseLocalStorage = async () => {
-    setErrorMessage(null);
-    setSaving(true);
-    await onApplyFirebaseConfig(false, null);
-    setStatusMessage("Đã chuyển về lưu trữ cục bộ (localStorage).");
-    setSaving(false);
-  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,6 +105,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     );
   };
 
+  const cloudLabel =
+    cloudStorageKind === "supabase"
+      ? "Supabase (cơ sở dữ liệu đám mây)"
+      : "Máy chủ ứng dụng (tệp JSON)";
+
+  const syncLabel: Record<WorkspaceSyncStatus, string> = {
+    idle: "Chưa đăng nhập",
+    local: "Bản ngoại tuyến trên thiết bị này",
+    syncing: "Đang đồng bộ...",
+    synced: "Đã đồng bộ",
+    error: "Không kết nối được máy chủ",
+    offline: "Mất mạng – sẽ đồng bộ khi có kết nối",
+  };
+
   return (
     <div
       role="dialog"
@@ -161,35 +144,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Storage & Schema Version Status */}
+        {/* Trạng thái lưu trữ & đồng bộ đa thiết bị */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div className="p-3.5 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Bộ lưu trữ đang dùng
             </p>
             <p className="font-bold mt-1 flex items-center gap-1.5">
-              {activeStorageKind === "firebase" ? (
+              {signedIn ? (
                 <>
                   <Cloud className="w-4 h-4 text-[#133C42] dark:text-[#B3DEE2]" />
-                  <span>FirebaseStorage (Firestore)</span>
+                  <span>{cloudLabel}</span>
                 </>
               ) : (
                 <>
                   <HardDrive className="w-4 h-4 text-[#223A1E] dark:text-[#EAF2D7]" />
-                  <span>LocalStorage (Mặc định)</span>
+                  <span>Thiết bị (localStorage)</span>
                 </>
               )}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              Dữ liệu trên thiết bị luôn được giữ làm bản sao tạm; dữ liệu chung
+              được lưu tập trung trên máy chủ khi đã đăng nhập.
             </p>
           </div>
 
           <div className="p-3.5 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Phiên bản dữ liệu
+              Đồng bộ đa thiết bị
             </p>
-            <p className="font-bold mt-1 tabular-nums">
-              v{schemaVersion} (Chuẩn hiện hành: v{CURRENT_SCHEMA_VERSION})
+            <p className="font-bold mt-1 flex items-center gap-1.5">
+              {syncStatus === "synced" && (
+                <CheckCircle2 className="w-4 h-4 text-[#4F7A3F]" />
+              )}
+              {syncStatus === "syncing" && (
+                <RefreshCw className="w-4 h-4 animate-spin text-[#133C42] dark:text-[#B3DEE2]" />
+              )}
+              {syncStatus === "offline" && (
+                <WifiOff className="w-4 h-4 text-slate-500" />
+              )}
+              {syncStatus === "error" && (
+                <AlertTriangle className="w-4 h-4 text-[#B24A6B]" />
+              )}
+              {syncStatus === "local" && (
+                <HardDrive className="w-4 h-4 text-[#223A1E] dark:text-[#EAF2D7]" />
+              )}
+              <span>{syncLabel[syncStatus]}</span>
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              Lần đồng bộ gần nhất: {formatSyncedAt(lastSyncedAt)}
             </p>
           </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-[#FAFBFD] dark:bg-[#0F171E] border border-slate-200 dark:border-slate-800">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Phiên bản dữ liệu
+          </p>
+          <p className="font-bold mt-1 tabular-nums">
+            v{schemaVersion} (Chuẩn hiện hành: v{CURRENT_SCHEMA_VERSION})
+          </p>
         </div>
 
         {/* 4.4 Item 3: Công tắc "Duyệt AI trước khi hiển thị" */}
@@ -295,27 +309,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* 4.4 Item 1: Firebase Opt-In Config */}
-        <div className="space-y-2.5">
-          <label
-            htmlFor="firebase-config-textarea"
-            className="block text-sm font-semibold"
-          >
-            Cấu hình Firebase (tùy chọn – chỉ bật khi dán cấu hình)
-          </label>
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            Mặc định ứng dụng lưu cục bộ trên trình duyệt để dùng thử ngay. Khi triển khai đồng bộ nhiều máy qua Firestore, dán đối tượng JSON cấu hình Firebase Web vào ô bên dưới:
-          </p>
-          <textarea
-            id="firebase-config-textarea"
-            rows={5}
-            value={configJson}
-            onChange={(e) => setConfigJson(e.target.value)}
-            placeholder={`{\n  "apiKey": "...",\n  "authDomain": "...",\n  "projectId": "...",\n  "appId": "..."\n}`}
-            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-[#FAFBFD] dark:bg-[#0F171E] p-3 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E27396]"
-          />
-        </div>
-
         {errorMessage && (
           <p className="p-3 rounded-xl bg-[#EFCFE3]/50 border border-[#E27396] text-xs sm:text-sm text-[#4A1A2C] dark:text-[#EFCFE3]">
             {errorMessage}
@@ -328,26 +321,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>{statusMessage}</span>
           </p>
         )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleUseLocalStorage}
-            className="min-h-[42px] px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-          >
-            Dùng LocalStorage
-          </button>
-
-          <button
-            type="button"
-            disabled={saving || !configJson.trim()}
-            onClick={handleEnableFirebase}
-            className="min-h-[42px] px-5 py-2 rounded-xl bg-[#E27396] hover:bg-[#EA9AB2] disabled:opacity-50 text-[#1D1519] text-xs sm:text-sm font-semibold cursor-pointer"
-          >
-            {saving ? "Đang kết nối..." : "Kích hoạt FirebaseStorage"}
-          </button>
-        </div>
       </div>
     </div>
   );

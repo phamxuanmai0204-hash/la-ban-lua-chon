@@ -1,14 +1,3 @@
-import { initializeApp, getApps, deleteApp, type FirebaseApp } from "firebase/app";
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  getDocs,
-  collection,
-  onSnapshot,
-  type Firestore,
-} from "firebase/firestore";
 import { createInitialAppState, createStudentProfile } from "../data/mockData";
 import { sanitizeInterestQuiz } from "../data/interestQuiz";
 import { DEFAULT_CLASS_ID } from "../data/schoolClasses";
@@ -17,7 +6,6 @@ import type {
   AIMessageStatus,
   AppState,
   AssessmentLevelMap,
-  FirebaseConfig,
   Student,
   StudentSummary,
 } from "../types";
@@ -25,14 +13,13 @@ import type {
 export const CURRENT_SCHEMA_VERSION = 6;
 export const MAIN_STATE_KEY = "la_ban_app_state";
 const LEGACY_V1_STORAGE_KEY = "la_ban_lua_chon_state_v1";
-const FIREBASE_CONFIG_STORAGE_KEY = "la_ban_firebase_config_v2";
-const FIREBASE_ENABLED_STORAGE_KEY = "la_ban_firebase_enabled_v2";
 
 /**
- * Common storage interface supporting localStorage and Firestore adapters.
+ * Local cache interface. Dữ liệu dùng chung giữa các thiết bị được đồng bộ
+ * qua API máy chủ (xem useWorkspaceSync), không dùng Firestore phía trình duyệt.
  */
 export interface StorageService {
-  readonly kind: "local" | "firebase";
+  readonly kind: "local";
   get<T>(key: string): Promise<T | null>;
   set<T>(key: string, value: T): Promise<void>;
   list<T>(prefix: string): Promise<{ key: string; value: T }[]>;
@@ -530,121 +517,6 @@ export class LocalStorageAdapter implements StorageService {
       window.removeEventListener("storage", onStorage);
     };
   }
-}
-
-/**
- * Firebase Firestore implementation of StorageService.
- * Only initialized when the user pastes a valid FirebaseConfig in Settings.
- */
-export class FirebaseStorageAdapter implements StorageService {
-  readonly kind = "firebase" as const;
-  private db: Firestore;
-  private collectionName = "la_ban_lua_chon";
-
-  constructor(config: FirebaseConfig) {
-    const appName = `la-ban-custom-${config.projectId}`;
-    const existing = getApps().find((a) => a.name === appName);
-    const app: FirebaseApp = existing || initializeApp(config, appName);
-    this.db = getFirestore(app);
-  }
-
-  async get<T>(key: string): Promise<T | null> {
-    const snap = await getDoc(doc(this.db, this.collectionName, key));
-    if (!snap.exists()) return null;
-    const data = snap.data();
-    return (data?.payload as T) ?? null;
-  }
-
-  async set<T>(key: string, value: T): Promise<void> {
-    await setDoc(doc(this.db, this.collectionName, key), {
-      payload: value,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  async list<T>(prefix: string): Promise<{ key: string; value: T }[]> {
-    const snap = await getDocs(collection(this.db, this.collectionName));
-    const items: { key: string; value: T }[] = [];
-    snap.forEach((docSnap) => {
-      if (docSnap.id.startsWith(prefix)) {
-        const data = docSnap.data();
-        if (data?.payload !== undefined) {
-          items.push({ key: docSnap.id, value: data.payload as T });
-        }
-      }
-    });
-    return items;
-  }
-
-  subscribe<T>(key: string, callback: (value: T | null) => void): () => void {
-    return onSnapshot(
-      doc(this.db, this.collectionName, key),
-      (snap) => {
-        if (!snap.exists()) {
-          callback(null);
-          return;
-        }
-        const data = snap.data();
-        callback((data?.payload as T) ?? null);
-      },
-      () => {
-        // Ignore transient listener errors gracefully
-      }
-    );
-  }
-
-  static async disposeCustomApps(): Promise<void> {
-    const customApps = getApps().filter((a) =>
-      a.name.startsWith("la-ban-custom-")
-    );
-    await Promise.all(customApps.map((a) => deleteApp(a)));
-  }
-}
-
-export function loadSavedFirebaseSettings(): {
-  enabled: boolean;
-  config: FirebaseConfig | null;
-} {
-  try {
-    const enabled = localStorage.getItem(FIREBASE_ENABLED_STORAGE_KEY) === "true";
-    const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
-    if (!raw) return { enabled: false, config: null };
-    const parsed = JSON.parse(raw) as FirebaseConfig;
-    if (!parsed.apiKey || !parsed.projectId) {
-      return { enabled: false, config: null };
-    }
-    return { enabled, config: parsed };
-  } catch {
-    return { enabled: false, config: null };
-  }
-}
-
-export function saveFirebaseSettings(
-  enabled: boolean,
-  config: FirebaseConfig | null
-): void {
-  try {
-    localStorage.setItem(FIREBASE_ENABLED_STORAGE_KEY, String(enabled));
-    if (config) {
-      localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(config));
-    } else {
-      localStorage.removeItem(FIREBASE_CONFIG_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage issues
-  }
-}
-
-export function createActiveStorageService(): StorageService {
-  const { enabled, config } = loadSavedFirebaseSettings();
-  if (enabled && config) {
-    try {
-      return new FirebaseStorageAdapter(config);
-    } catch {
-      return new LocalStorageAdapter();
-    }
-  }
-  return new LocalStorageAdapter();
 }
 
 export const localBackupStorage = new LocalStorageAdapter();

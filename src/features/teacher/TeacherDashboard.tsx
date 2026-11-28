@@ -40,7 +40,6 @@ import {
   schoolClassLabel,
 } from "../../data/schoolClasses";
 import { requestTeacherJourneySummary } from "../../services/ai";
-import { fetchStudentRecords } from "../../services/studentRecords";
 import {
   listStudentAccounts,
   type StudentAccountSummary,
@@ -177,21 +176,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     account?.className ?? DEFAULT_CLASS_ID
   );
 
-  // Dữ liệu do thiết bị của từng học sinh gửi lên cho giáo viên chủ nhiệm CoThuy912.
-  const [remoteStudents, setRemoteStudents] = useState<Student[]>([]);
-  useEffect(() => {
-    if (!authSession || authSession.user.role !== "teacher") return;
-    if (offlineSession || authSession.token.startsWith("local-")) return;
-    if (typeof navigator !== "undefined" && !navigator.onLine) return;
-    let active = true;
-    void fetchStudentRecords(authSession).then((records) => {
-      if (active) setRemoteStudents(records.map((record) => record.student));
-    });
-    return () => {
-      active = false;
-    };
-  }, [authSession, offlineSession]);
-
   // Nguồn duy nhất cho danh sách Lớp 9 là tài khoản học sinh trên hệ thống.
   const [accountList, setAccountList] = useState<StudentAccountSummary[] | null>(
     null
@@ -237,7 +221,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     if (!accountList) return [];
     const byId = new Map<string, Student>();
     for (const student of allStudents) byId.set(student.id, student);
-    for (const remote of remoteStudents) byId.set(remote.id, remote);
     return accountList
       .filter((item) => item.className === selectedClass)
       .map((item) => {
@@ -247,7 +230,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           createStudentProfile(id, item.fullName, item.className)
         );
       });
-  }, [accountList, allStudents, remoteStudents, selectedClass]);
+  }, [accountList, allStudents, selectedClass]);
 
   const [activeTab, setActiveTab] = useState<TeacherTab>("class");
   const [classViewMode, setClassViewMode] = useState<"board" | "table">(

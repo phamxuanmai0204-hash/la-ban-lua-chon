@@ -19,12 +19,9 @@ import {
   type SchoolRoster,
 } from "./data/schoolClasses";
 import {
-  createActiveStorageService,
-  FirebaseStorageAdapter,
-  localBackupStorage,
+  LocalStorageAdapter,
   MAIN_STATE_KEY,
   migrateAppState,
-  saveFirebaseSettings,
   type StorageService,
 } from "./services/storage";
 import {
@@ -40,14 +37,13 @@ import {
   pruneLocalStudentAccounts,
   validateStoredSession,
 } from "./services/auth";
-import { publishStudentRecord } from "./services/studentRecords";
+import { useWorkspaceSync } from "./hooks/useWorkspaceSync";
 import type {
   AIMessage,
   AIModerationAction,
   AIModerationLog,
   AppState,
   AuthSession,
-  FirebaseConfig,
   FontSizeScale,
   LinkedChild,
   Meeting,
@@ -94,8 +90,8 @@ function childOptionLabel(link: LinkedChild): string {
 }
 
 export default function App() {
-  const [storageService, setStorageService] = useState<StorageService>(() =>
-    createActiveStorageService()
+  const [storageService] = useState<StorageService>(
+    () => new LocalStorageAdapter()
   );
   const [appState, setAppState] = useState<AppState>(() =>
     createInitialAppState()
@@ -118,7 +114,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   const lastSerializedRef = useRef<string>("");
-  const pendingOfflineSyncRef = useRef<boolean>(false);
 
   // Load state from active StorageService (with schema migration) and subscribe
   useEffect(() => {
@@ -143,19 +138,11 @@ export default function App() {
             JSON.stringify(stored) !== lastSerializedRef.current
           ) {
             await storageService.set(MAIN_STATE_KEY, migrated);
-            await localBackupStorage.set(MAIN_STATE_KEY, migrated);
             if (resetNeeded) markLegacyStudentStateReset();
           }
         } else {
-          // Fallback to local backup if switching to an empty remote store
-          const localBackup = await localBackupStorage.get<AppState>(
-            MAIN_STATE_KEY
-          );
-          if (!active) return;
           const resetNeeded = legacyStudentStateResetNeeded();
-          const initialBase = localBackup
-            ? migrateAppState(localBackup)
-            : createInitialAppState();
+          const initialBase = createInitialAppState();
           const initial = resetNeeded
             ? withoutLegacyStudents(initialBase)
             : initialBase;
@@ -194,52 +181,14 @@ export default function App() {
     };
   }, [storageService]);
 
-  // Persist changes after hydration (always write localBackupStorage offline; flush when online)
+  // Persist changes after hydration to localStorage (cache của thiết bị).
   useEffect(() => {
     if (!isHydrated) return;
     const serialized = JSON.stringify(appState);
     if (serialized === lastSerializedRef.current) return;
     lastSerializedRef.current = serialized;
-
-    if (storageService.kind === "local") {
-      void storageService.set(MAIN_STATE_KEY, appState);
-      return;
-    }
-
-    void localBackupStorage.set(MAIN_STATE_KEY, appState);
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      pendingOfflineSyncRef.current = true;
-      return;
-    }
-
-    void storageService
-      .set(MAIN_STATE_KEY, appState)
-      .then(() => {
-        pendingOfflineSyncRef.current = false;
-      })
-      .catch(() => {
-        pendingOfflineSyncRef.current = true;
-      });
+    void storageService.set(MAIN_STATE_KEY, appState);
   }, [appState, storageService, isHydrated]);
-
-  // Automatically sync pending offline edits when network returns
-  useEffect(() => {
-    const handleBackOnline = async () => {
-      if (storageService.kind !== "firebase") return;
-      if (!pendingOfflineSyncRef.current) return;
-      try {
-        const latestLocal = await localBackupStorage.get<AppState>(MAIN_STATE_KEY);
-        if (latestLocal) {
-          await storageService.set(MAIN_STATE_KEY, latestLocal);
-          pendingOfflineSyncRef.current = false;
-        }
-      } catch {
-        // Keep pending flag for next online retry
-      }
-    };
-    window.addEventListener("online", handleBackOnline);
-    return () => window.removeEventListener("online", handleBackOnline);
-  }, [storageService]);
 
   // Học sinh tự đăng ký: hồ sơ được tạo từ chính tài khoản, không có dữ liệu mẫu.
   useEffect(() => {
@@ -278,6 +227,14 @@ export default function App() {
     });
   }, [isHydrated, session, appState.students]);
 
+  // Đồng bộ dữ liệu giữa các thiết bị qua máy chủ (Supabase khi đã cấu hình).
+  const workspaceSync = useWorkspaceSync({
+    session,
+    hydrated: isHydrated,
+    appState,
+    setAppState,
+  });
+
   useEffect(() => {
     const root = document.documentElement;
     if (appState.settings.darkMode) {
@@ -311,21 +268,6 @@ export default function App() {
   const handleResetSampleData = () => {
     const fresh = createInitialAppState();
     setAppState(fresh);
-  };
-
-  const handleApplyFirebaseConfig = async (
-    enabled: boolean,
-    config: FirebaseConfig | null
-  ) => {
-    saveFirebaseSettings(enabled, config);
-    if (enabled && config) {
-      const nextAdapter = new FirebaseStorageAdapter(config);
-      await nextAdapter.set(MAIN_STATE_KEY, appState);
-      setStorageService(nextAdapter);
-    } else {
-      await FirebaseStorageAdapter.disposeCustomApps();
-      setStorageService(createActiveStorageService());
-    }
   };
 
   const handleUpdateStudent = (updated: Student) => {
@@ -745,33 +687,6 @@ export default function App() {
     return null;
   }, [session, appState.students, activeChildId]);
 
-  // Mỗi thay đổi của học sinh được gửi lên máy chủ để giáo viên chủ nhiệm
-  // (tài khoản cố định CoThuy912) nhận được hồ sơ từ thiết bị của em.
-  const lastPublishedRef = useRef<string>("");
-  useEffect(() => {
-    if (!isHydrated || !session || !activeStudent) return;
-    if (session.user.role !== "student") return;
-    if (session.token.startsWith("local-")) return;
-
-    const serialized = JSON.stringify(activeStudent);
-    let cancelled = false;
-    const publish = () => {
-      if (serialized === lastPublishedRef.current) return;
-      if (typeof navigator !== "undefined" && !navigator.onLine) return;
-      void publishStudentRecord(session, activeStudent).then((ok) => {
-        if (!cancelled && ok) lastPublishedRef.current = serialized;
-      });
-    };
-
-    const timer = setTimeout(publish, 800);
-    window.addEventListener("online", publish);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      window.removeEventListener("online", publish);
-    };
-  }, [isHydrated, session, activeStudent]);
-
   const parentChildOptions = parentLinks.map((link) => ({
     id: link.studentId,
     label: childOptionLabel(link),
@@ -913,8 +828,11 @@ export default function App() {
       <SettingsModal
         open={showSettings}
         appState={appState}
-        activeStorageKind={storageService.kind}
         schemaVersion={appState.schemaVersion}
+        signedIn={Boolean(session) && !session?.token.startsWith("local-")}
+        syncStatus={workspaceSync.status}
+        cloudStorageKind={workspaceSync.storageKind}
+        lastSyncedAt={workspaceSync.lastSyncedAt}
         requireTeacherApprovalBeforeDisplay={
           appState.settings.requireTeacherApprovalBeforeDisplay
         }
@@ -922,7 +840,6 @@ export default function App() {
         onResetSampleData={handleResetSampleData}
         onImportFullAppState={(next) => setAppState(next)}
         onClose={() => setShowSettings(false)}
-        onApplyFirebaseConfig={handleApplyFirebaseConfig}
       />
 
       <OfflineIndicator />

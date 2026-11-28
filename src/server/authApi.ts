@@ -22,23 +22,30 @@ import {
   type SchoolRoster,
 } from "../data/schoolClasses.ts";
 import type {
+  AIMessage,
+  AIModerationLog,
   AuthUser,
   LinkedChild,
+  Meeting,
   RegisterAccountInput,
   Role,
   Student,
 } from "../types.ts";
+import { getDataDir, isCloudDatabaseEnabled } from "./db.ts";
+import {
+  CLASS_SETTINGS_ID,
+  accountsStore,
+  meetingsStore,
+  messagesStore,
+  moderationLogsStore,
+  recordsStore,
+  sessionsStore,
+  settingsStore,
+  type StoredAccount,
+  type StoredSession,
+  type StoredStudentRecord,
+} from "./stores.ts";
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(process.cwd(), ".data");
-const ACCOUNTS_FILE = path.join(DATA_DIR, "auth-accounts.json");
-const SESSIONS_FILE = path.join(DATA_DIR, "auth-sessions.json");
-const STUDENT_RECORDS_FILE = path.join(DATA_DIR, "student-records.json");
-const LEGACY_STUDENT_RESET_MARKER = path.join(
-  DATA_DIR,
-  "legacy-students-reset-v2.done"
-);
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PIN_PATTERN = /^\d{4}$/;
 
@@ -52,91 +59,6 @@ const HOMEROOM_TEACHER = {
   username: HOMEROOM_TEACHER_USERNAME,
   password: "041126",
 };
-
-interface StoredAccount {
-  id: string;
-  fullName: string;
-  role: Role;
-  username: string;
-  usernameKey: string;
-  passwordHash: string;
-  salt: string;
-  createdAt: string;
-  className?: string;
-  parentPin?: string;
-  linkedChildren?: LinkedChild[];
-  /** Giáo viên chủ nhiệm được liên kết tự động (luôn là CoThuy912). */
-  homeroomTeacherUsername?: string;
-}
-
-interface StoredSession {
-  token: string;
-  userId: string;
-  createdAt: number;
-  expiresAt: number;
-}
-
-/** Bản dữ liệu học sinh do chính thiết bị của em gửi lên cho giáo viên chủ nhiệm. */
-interface StoredStudentRecord {
-  studentId: string;
-  accountId: string;
-  fullName: string;
-  className: string;
-  teacherUsername: string;
-  updatedAt: string;
-  student: Student;
-}
-
-/**
- * Small JSON-file collection so accounts survive server restarts today and can
- * be swapped for a real database later without touching the HTTP layer.
- */
-class JsonCollection<T> {
-  private data: T[] | null = null;
-  private loading: Promise<T[]> | null = null;
-  private queue: Promise<void> = Promise.resolve();
-  private readonly file: string;
-
-  constructor(file: string) {
-    this.file = file;
-  }
-
-  async read(): Promise<T[]> {
-    if (this.data) return this.data;
-    if (!this.loading) {
-      this.loading = (async () => {
-        try {
-          const raw = await fs.readFile(this.file, "utf8");
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed) ? (parsed as T[]) : [];
-        } catch {
-          return [];
-        }
-      })().then((list) => {
-        this.data = list;
-        return list;
-      });
-    }
-    return this.loading;
-  }
-
-  async replace(list: T[]): Promise<void> {
-    this.data = list;
-    this.queue = this.queue
-      .then(async () => {
-        await fs.mkdir(path.dirname(this.file), { recursive: true });
-        await fs.writeFile(this.file, JSON.stringify(list, null, 2), "utf8");
-      })
-      .catch((err) => {
-        console.error(`Không ghi được dữ liệu xác thực (${this.file}):`, err);
-      });
-    return this.queue;
-  }
-}
-
-const accountsStore = new JsonCollection<StoredAccount>(ACCOUNTS_FILE);
-const sessionsStore = new JsonCollection<StoredSession>(SESSIONS_FILE);
-const recordsStore = new JsonCollection<StoredStudentRecord>(STUDENT_RECORDS_FILE);
 
 function hashPassword(password: string, salt: string): string {
   return crypto.scryptSync(password, salt, 64).toString("hex");
@@ -251,20 +173,30 @@ async function ensureHomeroomTeacherAccount(): Promise<void> {
  * đảm bảo chỉ chạy đúng một lần, không xóa tài khoản do người dùng tạo sau đó.
  */
 async function resetLegacyStudentDataOnce(): Promise<void> {
+  // Dữ liệu đã nằm trên Supabase thì không bao giờ chạy lệnh dọn legacy:
+  // marker lưu trên ổ đĩa tạm có thể mất và xoá nhầm tài khoản thật.
+  if (isCloudDatabaseEnabled()) return;
+
+  const dataDir = getDataDir();
+  const marker = path.join(dataDir, "legacy-students-reset-v2.done");
   try {
-    await fs.access(LEGACY_STUDENT_RESET_MARKER);
+    await fs.access(marker);
     return;
   } catch {
     // Chưa reset lần nào — tiếp tục.
   }
 
   try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.mkdir(dataDir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupDir = path.join(DATA_DIR, `backup-before-reset-${stamp}`);
+    const backupDir = path.join(dataDir, `backup-before-reset-${stamp}`);
     await fs.mkdir(backupDir, { recursive: true });
     await Promise.all(
-      [ACCOUNTS_FILE, SESSIONS_FILE, STUDENT_RECORDS_FILE].map(async (file) => {
+      [
+        path.join(dataDir, "auth-accounts.json"),
+        path.join(dataDir, "auth-sessions.json"),
+        path.join(dataDir, "student-records.json"),
+      ].map(async (file) => {
         try {
           await fs.copyFile(file, path.join(backupDir, path.basename(file)));
         } catch {
@@ -310,7 +242,7 @@ async function resetLegacyStudentDataOnce(): Promise<void> {
     }
 
     await fs.writeFile(
-      LEGACY_STUDENT_RESET_MARKER,
+      marker,
       JSON.stringify(
         {
           completedAt: new Date().toISOString(),
@@ -510,9 +442,13 @@ function readString(
 }
 
 export async function registerAuthRoutes(app: Express): Promise<void> {
-  if (process.env.NODE_ENV === "production" && !process.env.DATA_DIR) {
+  if (isCloudDatabaseEnabled()) {
+    console.log(
+      "[db] Đang dùng Supabase làm cơ sở dữ liệu trung tâm cho tài khoản, hành trình và lịch sử AI."
+    );
+  } else if (process.env.NODE_ENV === "production" && !process.env.DATA_DIR) {
     console.warn(
-      `[auth] Tài khoản đang lưu tại ${DATA_DIR}. Trên nền tảng như Render, thư mục này là ổ đĩa tạm và sẽ mất khi triển khai lại — hãy gắn Persistent Disk và đặt biến môi trường DATA_DIR trỏ vào thư mục đó.`
+      `[db] Chưa cấu hình SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY. Dữ liệu đang lưu tại ${getDataDir()}; trên Render thư mục này là ổ đĩa tạm và sẽ mất khi triển khai lại. Hãy làm theo hướng dẫn trong README để bật Supabase.`
     );
   }
   await ensureHomeroomTeacherAccount();
@@ -1115,6 +1051,12 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
       );
     }
 
+    await Promise.all([
+      messagesStore.deleteByColumn("student_id", [studentCode]),
+      moderationLogsStore.deleteByColumn("student_id", [studentCode]),
+      meetingsStore.deleteByColumn("student_id", [studentCode]),
+    ]);
+
     res.status(204).end();
   });
 
@@ -1195,5 +1137,242 @@ export async function registerAuthRoutes(app: Express): Promise<void> {
   app.get("/api/school/roster", async (_req, res) => {
     const accounts = await accountsStore.read();
     res.json(buildRoster(accounts));
+  });
+
+  const workspaceStudentIds = (
+    account: StoredAccount,
+    accounts: StoredAccount[]
+  ): Set<string> => {
+    if (account.role === "teacher") {
+      return new Set(
+        accounts
+          .filter((item) => item.role === "student")
+          .map((item) => `acc:${item.id}`)
+      );
+    }
+    if (account.role === "student") {
+      return new Set([`acc:${account.id}`]);
+    }
+    return new Set(
+      (account.linkedChildren ?? []).map((child) => child.studentId)
+    );
+  };
+
+  const buildWorkspaceSnapshot = async (account: StoredAccount) => {
+    const accounts = await accountsStore.read();
+    const allowed = workspaceStudentIds(account, accounts);
+    const [records, messages, logs, meetings, settings] = await Promise.all([
+      recordsStore.read(),
+      messagesStore.read(),
+      moderationLogsStore.read(),
+      meetingsStore.read(),
+      settingsStore.read(),
+    ]);
+    const settingsRow = settings.find((row) => row.id === CLASS_SETTINGS_ID);
+    return {
+      students: records
+        .filter((record) => allowed.has(record.studentId))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, "vi"))
+        .map((record) => record.student),
+      aiMessages: messages.filter((message) =>
+        allowed.has(message.studentId)
+      ),
+      aiModerationLogs: logs.filter((log) => allowed.has(log.studentId)),
+      meetings: meetings.filter((meeting) =>
+        allowed.has(meeting.studentId)
+      ),
+      settings: {
+        requireTeacherApprovalBeforeDisplay:
+          settingsRow?.requireTeacherApprovalBeforeDisplay === true,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  /**
+   * Tải toàn bộ dữ liệu hành trình mà tài khoản được phép xem từ cơ sở dữ liệu
+   * trung tâm: học sinh chỉ thấy dữ liệu của mình, phụ huynh thấy các con đã
+   * liên kết PIN, giáo viên chủ nhiệm thấy cả lớp.
+   */
+  app.get("/api/sync/workspace", async (req, res) => {
+    const token = getBearerToken(req);
+    const account = token ? await findAccountByToken(token) : null;
+    if (!account) {
+      res.status(401).json({
+        error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        code: "UNAUTHORIZED",
+      });
+      return;
+    }
+    res.json(await buildWorkspaceSnapshot(account));
+  });
+
+  /**
+   * Gửi các thay đổi mới lên cơ sở dữ liệu trung tâm. Máy chủ luôn lọc theo
+   * quyền của tài khoản: học sinh chỉ ghi dữ liệu của mình; phụ huynh chỉ xác
+   * nhận phiếu cam kết/biên bản họp của con; giáo viên ghi toàn bộ lớp.
+   */
+  app.post("/api/sync/workspace", async (req, res) => {
+    const token = getBearerToken(req);
+    const account = token ? await findAccountByToken(token) : null;
+    if (!account) {
+      res.status(401).json({
+        error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        code: "UNAUTHORIZED",
+      });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const accounts = await accountsStore.read();
+    const allowed = workspaceStudentIds(account, accounts);
+    const now = new Date().toISOString();
+
+    const incomingStudents = Array.isArray(body.students)
+      ? (body.students as Student[]).filter(
+          (student) =>
+            student &&
+            typeof student === "object" &&
+            typeof student.id === "string" &&
+            allowed.has(student.id)
+        )
+      : [];
+    const incomingMessages = Array.isArray(body.aiMessages)
+      ? (body.aiMessages as AIMessage[]).filter(
+          (message) =>
+            message &&
+            typeof message.id === "string" &&
+            typeof message.studentId === "string" &&
+            allowed.has(message.studentId)
+        )
+      : [];
+    const incomingLogs = Array.isArray(body.aiModerationLogs)
+      ? (body.aiModerationLogs as AIModerationLog[]).filter(
+          (log) =>
+            log &&
+            typeof log.id === "string" &&
+            typeof log.studentId === "string" &&
+            allowed.has(log.studentId)
+        )
+      : [];
+    const incomingMeetings = Array.isArray(body.meetings)
+      ? (body.meetings as Meeting[]).filter(
+          (meeting) =>
+            meeting &&
+            typeof meeting.id === "string" &&
+            typeof meeting.studentId === "string" &&
+            allowed.has(meeting.studentId)
+        )
+      : [];
+
+    const accountById = new Map(accounts.map((item) => [item.id, item]));
+
+    if (account.role === "parent") {
+      const existingRecords = await recordsStore.read();
+      const recordsToWrite: StoredStudentRecord[] = [];
+      for (const student of incomingStudents) {
+        const current = existingRecords.find(
+          (record) => record.studentId === student.id
+        );
+        const parentConfirmedAt = student.commitment?.parentConfirmedAt;
+        if (!current || parentConfirmedAt === undefined) continue;
+        if (
+          current.student.commitment?.parentConfirmedAt === parentConfirmedAt
+        ) {
+          continue;
+        }
+        recordsToWrite.push({
+          ...current,
+          updatedAt: now,
+          student: {
+            ...current.student,
+            commitment: {
+              ...current.student.commitment,
+              parentConfirmedAt,
+            },
+          },
+        });
+      }
+      if (recordsToWrite.length > 0) {
+        await recordsStore.upsertMany(recordsToWrite);
+      }
+
+      const existingMeetings = await meetingsStore.read();
+      const meetingsToWrite: Meeting[] = [];
+      for (const meeting of incomingMeetings) {
+        const current = existingMeetings.find(
+          (item) => item.id === meeting.id
+        );
+        if (!current) continue;
+        const parentConfirmed = meeting.confirmations?.parent;
+        if (parentConfirmed === undefined) continue;
+        if (current.confirmations?.parent === parentConfirmed) continue;
+        meetingsToWrite.push({
+          ...current,
+          confirmations: {
+            ...(current.confirmations ?? {}),
+            parent: parentConfirmed,
+          },
+        });
+      }
+      await meetingsStore.upsertMany(meetingsToWrite);
+    } else {
+      const recordsToWrite: StoredStudentRecord[] = [];
+      for (const student of incomingStudents) {
+        const accountId = student.id.slice("acc:".length);
+        const studentAccount = accountById.get(accountId);
+        recordsToWrite.push({
+          studentId: student.id,
+          accountId,
+          fullName:
+            typeof student.fullName === "string"
+              ? student.fullName
+              : studentAccount?.fullName ?? "Học sinh",
+          className:
+            typeof student.className === "string"
+              ? student.className
+              : DEFAULT_CLASS_ID,
+          teacherUsername: HOMEROOM_TEACHER.username,
+          updatedAt: now,
+          student,
+        });
+      }
+      await recordsStore.upsertMany(recordsToWrite);
+
+      await messagesStore.upsertMany(
+        incomingMessages.map((message) => ({ ...message }))
+      );
+      await moderationLogsStore.upsertMany(
+        incomingLogs.map((log) => ({ ...log }))
+      );
+      await meetingsStore.upsertMany(
+        incomingMeetings.map((meeting) => ({ ...meeting }))
+      );
+    }
+
+    if (account.role === "teacher" && body.settings && typeof body.settings === "object") {
+      const settingsBody = body.settings as Record<string, unknown>;
+      if (typeof settingsBody.requireTeacherApprovalBeforeDisplay === "boolean") {
+        await settingsStore.upsertMany([
+          {
+            id: CLASS_SETTINGS_ID,
+            requireTeacherApprovalBeforeDisplay:
+              settingsBody.requireTeacherApprovalBeforeDisplay,
+            updatedAt: now,
+          },
+        ]);
+      }
+    }
+
+    res.json(await buildWorkspaceSnapshot(account));
+  });
+
+  /** Thông tin phiên bản đồng bộ để giao diện hiển thị trạng thái lưu trữ. */
+  app.get("/api/sync/status", async (_req, res) => {
+    res.json({
+      kind: isCloudDatabaseEnabled() ? "supabase" : "json",
+      serverTime: new Date().toISOString(),
+      uptimeMs: Math.round(process.uptime() * 1000),
+    });
   });
 }

@@ -499,15 +499,6 @@ export interface LoginAccountInput {
   password: string;
 }
 
-export interface FirebaseConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket?: string;
-  messagingSenderId?: string;
-  appId: string;
-}
-
 export interface AppState {
   schemaVersion: number;
   students: Student[];
